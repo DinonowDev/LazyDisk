@@ -6,6 +6,7 @@ DerivedData/
 
 # macOS
 .DS_Store
+.cursor/
 
 # Swift Package Manager
 .swiftpm/
