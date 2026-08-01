@@ -1,6 +1,6 @@
 # LazyDisk
 
-A native macOS disk space analyzer and cleanup tool — inspired by DaisyDisk.
+A native macOS disk space analyzer and cleanup tool.
 
 ![LazyDisk — Browse](assets/preview.png)
 
