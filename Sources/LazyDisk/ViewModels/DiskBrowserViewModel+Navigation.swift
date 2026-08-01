@@ -60,6 +60,7 @@ extension DiskBrowserViewModel {
             if let cached = await cache.get(normalized), await cache.isComplete(cached) {
                 guard generation == navigationGeneration else { return }
                 entries = cached.entries
+                invalidateAllDerivedCaches()
                 currentPath = normalized
                 isLoading = false
                 loadedFromCache = true
@@ -188,6 +189,7 @@ extension DiskBrowserViewModel {
             }
             guard !Task.isCancelled else { return }
             smartCollectionResults = results
+            invalidateChartCaches()
             isScanningSmartCollection = false
             scanProgress = collection.title
         }

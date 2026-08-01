@@ -108,6 +108,13 @@ final class DiskBrowserViewModel: ObservableObject {
     var scanProgressSortTask: Task<Void, Never>?
     var scanProgressNeedsSort = false
     var hoverPublishTask: Task<Void, Never>?
+    var pendingScanUpdates: [Int: (size: Int64, isScanning: Bool)] = [:]
+    var scanUIBatchTask: Task<Void, Never>?
+    var filterCountsRevision: UInt = 0
+    var chartCacheRevision: UInt = 0
+    var cachedFilterCounts: (revision: UInt, value: [ContentFilter: Int])?
+    var cachedChartItems: (revision: UInt, value: [DiskItem])?
+    var cachedSunburstSegments: (revision: UInt, childMapKey: String, value: [SunburstSegment])?
     let scanner = DiskScanner.shared
     let cache = ScanCache.shared
     let globalSearch = GlobalSearchService.shared
@@ -207,14 +214,11 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     var filterCounts: [ContentFilter: Int] {
-        var counts: [ContentFilter: Int] = [:]
-        for filter in ContentFilter.allCases {
-            if filter == .all {
-                counts[filter] = entries.count
-            } else {
-                counts[filter] = entries.filter { filter.matches($0) }.count
-            }
+        if let cached = cachedFilterCounts, cached.revision == filterCountsRevision {
+            return cached.value
         }
+        let counts = computeFilterCounts()
+        cachedFilterCounts = (filterCountsRevision, counts)
         return counts
     }
 
@@ -243,53 +247,28 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     var chartItems: [DiskItem] {
-        let total = displayTotalSize
-        let sorted = browserListEntries
-            .filter { $0.size > 0 || $0.isScanning }
-            .sorted { $0.size > $1.size }
-
-        var visible: [DiskItem] = []
-        var otherSize: Int64 = 0
-        var otherCount = 0
-
-        for item in sorted {
-            if item.isScanning {
-                visible.append(item)
-                continue
-            }
-
-            let percent = item.percentage(of: total)
-            if percent < chartSmallItemThresholdPercent {
-                otherSize += item.size
-                otherCount += 1
-            } else {
-                visible.append(item)
-            }
+        if let cached = cachedChartItems, cached.revision == chartCacheRevision {
+            return cached.value
         }
-
-        if otherCount > 0 {
-            let otherName = otherCount == 1
-                ? L10n.filterOther
-                : "\(L10n.filterOther) (\(otherCount))"
-            visible.append(DiskItem(
-                id: Self.chartOtherGroupID,
-                url: URL(fileURLWithPath: "/"),
-                name: otherName,
-                size: otherSize,
-                isDirectory: false,
-                isVirtual: true
-            ))
-        }
-
-        return visible.sorted { $0.size > $1.size }
+        let items = computeChartItems()
+        cachedChartItems = (chartCacheRevision, items)
+        return items
     }
 
     var sunburstSegments: [SunburstSegment] {
-        SunburstLayoutEngine.build(
+        let key = "\(chartChildMap.count)"
+        if let cached = cachedSunburstSegments,
+           cached.revision == chartCacheRevision,
+           cached.childMapKey == key {
+            return cached.value
+        }
+        let segments = SunburstLayoutEngine.build(
             items: chartItems,
             totalSize: displayTotalSize,
             childrenByParentPath: chartChildMap
         )
+        cachedSunburstSegments = (chartCacheRevision, key, segments)
+        return segments
     }
 
     var selectedItems: [DiskItem] {

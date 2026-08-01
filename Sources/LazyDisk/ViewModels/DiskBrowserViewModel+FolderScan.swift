@@ -30,6 +30,7 @@ extension DiskBrowserViewModel {
         guard !Task.isCancelled, generation == nil || generation == navigationGeneration else { return }
 
         entries = listed
+        invalidateAllDerivedCaches()
 
         if trackDetailedProgress {
             scanProgressFraction = 0.1
@@ -69,6 +70,7 @@ extension DiskBrowserViewModel {
         guard !Task.isCancelled, generation == nil || generation == navigationGeneration else { return }
 
         entries = sorted
+        invalidateAllDerivedCaches()
         await cache.set(normalized, entries: sorted, isVolumeRoot: isVolumeRoot)
 
         if trackDetailedProgress {

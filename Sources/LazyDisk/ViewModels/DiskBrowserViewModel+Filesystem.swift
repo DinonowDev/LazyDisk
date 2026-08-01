@@ -149,6 +149,7 @@ extension DiskBrowserViewModel {
         let finalEntries = updatedEntries
         publishAfterCurrentUpdate { [weak self] in
             self?.entries = finalEntries
+            self?.invalidateAllDerivedCaches()
         }
     }
 

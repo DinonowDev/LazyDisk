@@ -90,6 +90,7 @@ extension DiskBrowserViewModel {
     func setSortOrder(_ order: SortOrder) {
         sortOrder = order
         entries = order.sort(entries)
+        invalidateAllDerivedCaches()
         savePreferences()
     }
 

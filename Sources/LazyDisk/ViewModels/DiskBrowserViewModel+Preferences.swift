@@ -34,11 +34,12 @@ extension DiskBrowserViewModel {
         chartChildRefreshTask?.cancel()
         let parents = chartItems.filter { $0.isDirectory && !$0.isVirtual }
 
-        chartChildRefreshTask = Task { @MainActor in
+        chartChildRefreshTask = Task.detached(priority: .utility) { [weak self] in
             try? await Task.sleep(nanoseconds: 50_000_000)
             guard !Task.isCancelled else { return }
 
             var newMap: [String: [DiskItem]] = [:]
+            let parallelism = AppPreferences.load().scanParallelism
 
             for item in parents {
                 guard !Task.isCancelled else { return }
@@ -47,15 +48,15 @@ extension DiskBrowserViewModel {
                 let parentPath = folderURL.path
                 let entries: [DiskItem]
 
-                if let cached = await cache.get(folderURL) {
+                if let cached = await ScanCache.shared.get(folderURL) {
                     entries = cached.entries
                 } else {
-                    let listed = await scanner.listDirectory(at: folderURL)
+                    let listed = await DiskScanner.shared.listDirectory(at: folderURL)
                     guard !Task.isCancelled else { return }
 
-                    let scanned = await scanner.scanDirectorySizes(
+                    let scanned = await DiskScanner.shared.scanDirectorySizes(
                         items: listed,
-                        parallelism: AppPreferences.load().scanParallelism
+                        parallelism: parallelism
                     )
                     guard !Task.isCancelled else { return }
 
@@ -66,20 +67,24 @@ extension DiskBrowserViewModel {
                         scannedAt: Date(),
                         isVolumeRoot: false
                     )
-                    guard await cache.isComplete(cachedDirectory) else { continue }
+                    guard await ScanCache.shared.isComplete(cachedDirectory) else { continue }
 
-                    await cache.set(folderURL, entries: sorted, isVolumeRoot: false)
+                    await ScanCache.shared.set(folderURL, entries: sorted, isVolumeRoot: false)
                     entries = sorted
                 }
 
-                let children = chartChildren(from: entries)
+                let children = await MainActor.run {
+                    self?.chartChildren(from: entries) ?? []
+                }
                 if !children.isEmpty {
                     newMap[parentPath] = children
                 }
             }
 
             guard !Task.isCancelled else { return }
-            publishChartChildMap(newMap)
+            await MainActor.run {
+                self?.publishChartChildMap(newMap)
+            }
         }
     }
 
@@ -123,6 +128,7 @@ extension DiskBrowserViewModel {
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
             keyboardFocusedIndex = 0
+            invalidateChartCaches()
 
             if searchScope == .entireVolume {
                 performGlobalSearch()

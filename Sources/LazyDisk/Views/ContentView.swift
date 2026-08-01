@@ -11,30 +11,8 @@ struct ContentView: View {
                 toolbar
                 Divider().opacity(0.5)
 
-                ZStack {
-                    browserContent
-                        .opacity(viewModel.activePanel == .browser ? 1 : 0)
-                        .allowsHitTesting(viewModel.activePanel == .browser)
-
-                    CleanupSuggestionsView()
-                        .opacity(viewModel.activePanel == .cleanup ? 1 : 0)
-                        .allowsHitTesting(viewModel.activePanel == .cleanup)
-
-                    DuplicateFinderView()
-                        .opacity(viewModel.activePanel == .duplicates ? 1 : 0)
-                        .allowsHitTesting(viewModel.activePanel == .duplicates)
-
-                    ScanDiffView()
-                        .opacity(viewModel.activePanel == .history ? 1 : 0)
-                        .allowsHitTesting(viewModel.activePanel == .history)
-
-                    DevModeView()
-                        .opacity(viewModel.activePanel == .dev ? 1 : 0)
-                        .allowsHitTesting(viewModel.activePanel == .dev)
-
-                    FreeSpaceGoalView()
-                        .opacity(viewModel.activePanel == .goal ? 1 : 0)
-                        .allowsHitTesting(viewModel.activePanel == .goal)
+                Group {
+                    activePanelContent
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
@@ -65,6 +43,24 @@ struct ContentView: View {
             set: { if !$0 { viewModel.exportMessage = nil } }
         )) {
             Button(L10n.ok) { viewModel.exportMessage = nil }
+        }
+    }
+
+    @ViewBuilder
+    private var activePanelContent: some View {
+        switch viewModel.activePanel {
+        case .browser:
+            browserContent
+        case .cleanup:
+            CleanupSuggestionsView()
+        case .duplicates:
+            DuplicateFinderView()
+        case .history:
+            ScanDiffView()
+        case .dev:
+            DevModeView()
+        case .goal:
+            FreeSpaceGoalView()
         }
     }
 
@@ -273,6 +269,12 @@ private struct ChartPanelView: View {
     @EnvironmentObject var viewModel: DiskBrowserViewModel
     let centerFolderName: String
 
+    @State private var chartHoverID: UUID?
+
+    private var effectiveChartHover: UUID? {
+        chartHoverID ?? viewModel.hoveredID
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             DiskOverviewHeader(
@@ -284,7 +286,7 @@ private struct ChartPanelView: View {
             ChartLegendView(
                 items: viewModel.chartItems,
                 totalSize: viewModel.displayTotalSize,
-                hoveredID: viewModel.hoveredID,
+                hoveredID: effectiveChartHover,
                 onHover: setChartHover,
                 onSelect: { item in
                     guard !item.isVirtual, item.isDirectory else { return }
@@ -302,7 +304,7 @@ private struct ChartPanelView: View {
                             totalSize: viewModel.displayTotalSize,
                             centerTitle: centerFolderName,
                             centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
-                            hoveredID: viewModel.hoveredID,
+                            hoveredID: effectiveChartHover,
                             onHover: setChartHover,
                             onSelect: chartItemSelected,
                             onAddToCollector: { item in
@@ -314,7 +316,7 @@ private struct ChartPanelView: View {
                             items: viewModel.chartItems,
                             childrenByParentPath: viewModel.chartChildMap,
                             totalSize: viewModel.displayTotalSize,
-                            hoveredID: viewModel.hoveredID,
+                            hoveredID: effectiveChartHover,
                             onHover: setChartHover,
                             onSelect: chartItemSelected,
                             onAddToCollector: { item in
@@ -327,7 +329,7 @@ private struct ChartPanelView: View {
                             totalSize: viewModel.displayTotalSize,
                             centerTitle: centerFolderName,
                             centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
-                            hoveredID: viewModel.hoveredID,
+                            hoveredID: effectiveChartHover,
                             onHover: setChartHover,
                             onSelect: chartItemSelected,
                             onAddToCollector: { item in
@@ -351,14 +353,19 @@ private struct ChartPanelView: View {
             chartHint
         }
         .background { chartBackground }
+        .onChange(of: viewModel.hoveredID) { newValue in
+            if newValue != nil { chartHoverID = nil }
+        }
+        .onChange(of: viewModel.navigationAnimationID) { _ in
+            chartHoverID = nil
+        }
         .task(id: chartChildrenRefreshKey) {
             viewModel.refreshChartChildren()
         }
     }
 
     private var chartChildrenRefreshKey: String {
-        let itemKey = viewModel.chartItems.map(\.id.uuidString).joined(separator: ",")
-        return "\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(itemKey)"
+        "\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(viewModel.chartCacheRevision)"
     }
 
     private var chartPickerAlignment: Alignment {
@@ -366,7 +373,7 @@ private struct ChartPanelView: View {
     }
 
     private func setChartHover(_ id: UUID?) {
-        viewModel.setHoveredID(id)
+        chartHoverID = id
     }
 
     private func chartItemSelected(_ item: DiskItem) {
