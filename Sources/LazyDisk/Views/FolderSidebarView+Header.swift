@@ -131,9 +131,6 @@ extension FolderSidebarView {
             size: {
                 SortColumnButton(title: L10n.columnSize, column: .size, alignment: .trailing)
             },
-            modified: {
-                SortColumnButton(title: L10n.columnModified, column: .date, alignment: .trailing)
-            },
             trailing: { Color.clear }
         )
         .font(.system(size: 10, weight: .semibold))

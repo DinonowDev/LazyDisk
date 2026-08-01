@@ -5,8 +5,7 @@ import AppKit
 enum FileListColumns {
     static let spacing: CGFloat = 10
     static let iconWidth: CGFloat = 32
-    static let sizeWidth: CGFloat = 68
-    static let modifiedWidth: CGFloat = 58
+    static let sizeWidth: CGFloat = 72
     static let chevronWidth: CGFloat = 12
     static let listPadding: CGFloat = 10
     static let rowPadding: CGFloat = 10
@@ -94,11 +93,6 @@ struct FolderRowView: View {
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(item.isScanning ? .secondary : .primary)
             },
-            modified: {
-                Text(item.isScanning ? "—" : item.formattedModifiedDate)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            },
             trailing: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .bold))
@@ -140,11 +134,10 @@ extension Int64 {
     var formattedSize: String { ByteFormatter.string(from: self) }
 }
 
-struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Modified: View, Trailing: View>: View {
+struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Trailing: View>: View {
     @ViewBuilder let icon: () -> Icon
     @ViewBuilder let name: () -> Name
     @ViewBuilder let size: () -> Size
-    @ViewBuilder let modified: () -> Modified
     @ViewBuilder let trailing: () -> Trailing
 
     var body: some View {
@@ -155,8 +148,6 @@ struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Modified: View,
                 .frame(maxWidth: .infinity, alignment: .leading)
             size()
                 .frame(width: FileListColumns.sizeWidth, alignment: .trailing)
-            modified()
-                .frame(width: FileListColumns.modifiedWidth, alignment: .trailing)
             trailing()
                 .frame(width: FileListColumns.chevronWidth)
         }
