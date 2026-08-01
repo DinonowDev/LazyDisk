@@ -27,7 +27,9 @@ actor ScanHistoryStore {
             entries: Array(snapshotEntries)
         )
 
-        let file = directory.appendingPathComponent("\(volumeID)-\(snapshot.id.uuidString).json")
+        let file = directory.appendingPathComponent(
+            ScanHistoryPaths.snapshotFilename(volumeID: volumeID, snapshotID: snapshot.id)
+        )
         if let data = try? JSONEncoder().encode(snapshot) {
             try? data.write(to: file)
         }
@@ -41,10 +43,11 @@ actor ScanHistoryStore {
         }
 
         return files
-            .filter { $0.lastPathComponent.hasPrefix(volumeID) }
+            .filter { $0.pathExtension == "json" }
             .compactMap { url -> ScanSnapshot? in
                 guard let data = try? Data(contentsOf: url) else { return nil }
-                return try? JSONDecoder().decode(ScanSnapshot.self, from: data)
+                guard let snapshot = try? JSONDecoder().decode(ScanSnapshot.self, from: data) else { return nil }
+                return snapshot.volumeID == volumeID ? snapshot : nil
             }
             .sorted { $0.scannedAt > $1.scannedAt }
     }
@@ -53,11 +56,27 @@ actor ScanHistoryStore {
         ScanHistoryDiff.computeDiff(current: current, previous: previous)
     }
 
+    func deleteSnapshot(volumeID: String, snapshotID: UUID) {
+        deleteSnapshotFile(volumeID: volumeID, snapshotID: snapshotID)
+    }
+
     private func prune(volumeID: String) {
         let all = snapshots(for: volumeID)
         guard all.count > maxSnapshotsPerVolume else { return }
         for snapshot in all.dropFirst(maxSnapshotsPerVolume) {
-            let file = directory.appendingPathComponent("\(volumeID)-\(snapshot.id.uuidString).json")
+            deleteSnapshotFile(volumeID: volumeID, snapshotID: snapshot.id)
+        }
+    }
+
+    private func deleteSnapshotFile(volumeID: String, snapshotID: UUID) {
+        let candidates = [
+            directory.appendingPathComponent(
+                ScanHistoryPaths.snapshotFilename(volumeID: volumeID, snapshotID: snapshotID)
+            ),
+            directory.appendingPathComponent("\(volumeID)-\(snapshotID.uuidString).json"),
+            directory.appendingPathComponent("-\(snapshotID.uuidString).json"),
+        ]
+        for file in candidates {
             try? FileManager.default.removeItem(at: file)
         }
     }

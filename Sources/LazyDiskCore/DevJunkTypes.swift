@@ -129,3 +129,124 @@ public struct DevJunkSummary: Sendable {
     public let byEcosystem: [DevJunkEcosystem: Int64]
     public let byPurpose: [DevJunkPurpose: Int64]
 }
+
+public enum DevJunkSortOrder: String, CaseIterable, Sendable, Identifiable {
+    case sizeDescending
+    case sizeAscending
+    case nameAscending
+    case nameDescending
+    case dateDescending
+    case dateAscending
+    case projectAscending
+    case projectDescending
+    case ecosystemAscending
+    case purposeAscending
+
+    public var id: String { rawValue }
+
+    public func sort(_ items: [DevJunkItem]) -> [DevJunkItem] {
+        switch self {
+        case .sizeDescending:
+            return items.sorted { $0.size > $1.size }
+        case .sizeAscending:
+            return items.sorted { $0.size < $1.size }
+        case .nameAscending:
+            return items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameDescending:
+            return items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .dateDescending:
+            return items.sorted { ($0.modifiedAt ?? .distantPast) > ($1.modifiedAt ?? .distantPast) }
+        case .dateAscending:
+            return items.sorted { ($0.modifiedAt ?? .distantPast) < ($1.modifiedAt ?? .distantPast) }
+        case .projectAscending:
+            return items.sorted {
+                let l = $0.projectName ?? $0.name
+                let r = $1.projectName ?? $1.name
+                let cmp = l.localizedCaseInsensitiveCompare(r)
+                if cmp != .orderedSame { return cmp == .orderedAscending }
+                return $0.size > $1.size
+            }
+        case .projectDescending:
+            return items.sorted {
+                let l = $0.projectName ?? $0.name
+                let r = $1.projectName ?? $1.name
+                let cmp = l.localizedCaseInsensitiveCompare(r)
+                if cmp != .orderedSame { return cmp == .orderedDescending }
+                return $0.size > $1.size
+            }
+        case .ecosystemAscending:
+            return items.sorted {
+                if $0.ecosystem != $1.ecosystem { return $0.ecosystem.rawValue < $1.ecosystem.rawValue }
+                return $0.size > $1.size
+            }
+        case .purposeAscending:
+            return items.sorted {
+                if $0.purpose != $1.purpose { return $0.purpose.rawValue < $1.purpose.rawValue }
+                return $0.size > $1.size
+            }
+        }
+    }
+
+    public func sortProjectGroups(_ groups: [(key: String, items: [DevJunkItem])]) -> [(key: String, items: [DevJunkItem])] {
+        groups
+            .map { (key: $0.key, items: sort($0.items)) }
+            .sorted { lhs, rhs in
+                switch self {
+                case .sizeDescending:
+                    return lhs.items.reduce(0) { $0 + $1.size } > rhs.items.reduce(0) { $0 + $1.size }
+                case .sizeAscending:
+                    return lhs.items.reduce(0) { $0 + $1.size } < rhs.items.reduce(0) { $0 + $1.size }
+                case .nameAscending, .projectAscending:
+                    return groupLabel(lhs).localizedCaseInsensitiveCompare(groupLabel(rhs)) == .orderedAscending
+                case .nameDescending, .projectDescending:
+                    return groupLabel(lhs).localizedCaseInsensitiveCompare(groupLabel(rhs)) == .orderedDescending
+                case .dateDescending:
+                    return maxDate(lhs) > maxDate(rhs)
+                case .dateAscending:
+                    return maxDate(lhs) < maxDate(rhs)
+                case .ecosystemAscending:
+                    return (lhs.items.first?.ecosystem.rawValue ?? "") < (rhs.items.first?.ecosystem.rawValue ?? "")
+                case .purposeAscending:
+                    return (lhs.items.first?.purpose.rawValue ?? "") < (rhs.items.first?.purpose.rawValue ?? "")
+                }
+            }
+    }
+
+    public func sortPurposeGroups(_ groups: [(purpose: DevJunkPurpose, items: [DevJunkItem])]) -> [(purpose: DevJunkPurpose, items: [DevJunkItem])] {
+        groups
+            .map { (purpose: $0.purpose, items: sort($0.items)) }
+            .sorted { lhs, rhs in
+                switch self {
+                case .sizeDescending:
+                    return lhs.items.reduce(0) { $0 + $1.size } > rhs.items.reduce(0) { $0 + $1.size }
+                case .sizeAscending:
+                    return lhs.items.reduce(0) { $0 + $1.size } < rhs.items.reduce(0) { $0 + $1.size }
+                case .purposeAscending:
+                    return lhs.purpose.rawValue < rhs.purpose.rawValue
+                case .ecosystemAscending:
+                    return (lhs.items.first?.ecosystem.rawValue ?? "") < (rhs.items.first?.ecosystem.rawValue ?? "")
+                case .nameAscending, .projectAscending:
+                    return lhs.purpose.rawValue < rhs.purpose.rawValue
+                case .nameDescending, .projectDescending:
+                    return lhs.purpose.rawValue > rhs.purpose.rawValue
+                case .dateDescending:
+                    return maxDate(lhs.items) > maxDate(rhs.items)
+                case .dateAscending:
+                    return maxDate(lhs.items) < maxDate(rhs.items)
+                }
+            }
+    }
+
+    private func groupLabel(_ group: (key: String, items: [DevJunkItem])) -> String {
+        if group.key == "__global__" { return "zzz_global" }
+        return group.items.first?.projectName ?? group.key.components(separatedBy: "/").last ?? group.key
+    }
+
+    private func maxDate(_ group: (key: String, items: [DevJunkItem])) -> Date {
+        maxDate(group.items)
+    }
+
+    private func maxDate(_ items: [DevJunkItem]) -> Date {
+        items.compactMap(\.modifiedAt).max() ?? .distantPast
+    }
+}

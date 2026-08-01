@@ -148,6 +148,27 @@ enum L10n {
     static var historyEmpty: String { t(.historyEmpty) }
     static var historyDiff: String { t(.historyDiff) }
     static var historySaved: String { t(.historySaved) }
+    static var historyEmptyDesc: String { t(.historyEmptyDesc) }
+    static func historySnapshotsCount(_ count: Int) -> String { String(format: t(.historySnapshotsCount), count) }
+    static var historyCompareCurrent: String { t(.historyCompareCurrent) }
+    static var historyComparePrevious: String { t(.historyComparePrevious) }
+    static var historyNetDelta: String { t(.historyNetDelta) }
+    static func historyPathsChanged(_ count: Int) -> String { String(format: t(.historyPathsChanged), count) }
+    static var historyRootWarning: String { t(.historyRootWarning) }
+    static var historyDeleteSnapshot: String { t(.historyDeleteSnapshot) }
+    static var historyRescan: String { t(.historyRescan) }
+    static var historyTopItems: String { t(.historyTopItems) }
+    static var historyTimeline: String { t(.historyTimeline) }
+    static var historyDetails: String { t(.historyDetails) }
+    static var historySearchPlaceholder: String { t(.historySearchPlaceholder) }
+    static var historyFilterAll: String { t(.historyFilterAll) }
+    static var historyNoChanges: String { t(.historyNoChanges) }
+    static var historySincePrevious: String { t(.historySincePrevious) }
+    static var historyTrackedSize: String { t(.historyTrackedSize) }
+    static var historyUsageTrend: String { t(.historyUsageTrend) }
+    static var historyOpenPath: String { t(.historyOpenPath) }
+    static var historyChangesTitle: String { t(.historyChangesTitle) }
+    static var historySnapshotDetail: String { t(.historySnapshotDetail) }
 
     // Dev
     static var devTitle: String { t(.devTitle) }
@@ -280,11 +301,65 @@ enum L10n {
         String(format: t(.devCollectorCount), count)
     }
 
+    static var devSelectedTitle: String { t(.devSelectedTitle) }
+
+    static func devSortTitle(_ order: DevJunkSortOrder) -> String {
+        switch order {
+        case .sizeDescending: return t(.sortSizeDesc)
+        case .sizeAscending: return t(.sortSizeAsc)
+        case .nameAscending: return t(.sortNameAsc)
+        case .nameDescending: return t(.sortNameDesc)
+        case .dateDescending: return t(.sortDateDesc)
+        case .dateAscending: return t(.sortDateAsc)
+        case .projectAscending: return t(.devSortProjectAsc)
+        case .projectDescending: return t(.devSortProjectDesc)
+        case .ecosystemAscending: return t(.devSortEcoAsc)
+        case .purposeAscending: return t(.devSortPurposeAsc)
+        }
+    }
+
     // Goal
     static var goalTitle: String { t(.goalTitle) }
     static var goalTarget: String { t(.goalTarget) }
     static var goalSuggest: String { t(.goalSuggest) }
     static var goalProgress: String { t(.goalProgress) }
+    static var goalScanning: String { t(.goalScanning) }
+    static var goalAddAll: String { t(.goalAddAll) }
+    static var goalSelectedTitle: String { t(.goalSelectedTitle) }
+    static var goalProjectedFree: String { t(.goalProjectedFree) }
+    static func goalSuggestionsTotal(_ size: String) -> String { String(format: t(.goalSuggestionsTotal), size) }
+    static var goalScanHint: String { t(.goalScanHint) }
+    static var goalSuggestionsTitle: String { t(.goalSuggestionsTitle) }
+    static func goalDaysUnused(_ days: Int) -> String { String(format: t(.goalDaysUnused), days) }
+    static var goalCategoryCache: String { t(.goalCategoryCache) }
+    static var goalCategoryLogs: String { t(.goalCategoryLogs) }
+    static var goalCategoryTrash: String { t(.goalCategoryTrash) }
+    static var goalCategoryInstallers: String { t(.goalCategoryInstallers) }
+    static var goalCategoryOldDownloads: String { t(.goalCategoryOldDownloads) }
+    static var goalCategoryLargeDownloads: String { t(.goalCategoryLargeDownloads) }
+    static var goalCategoryOldFiles: String { t(.goalCategoryOldFiles) }
+    static var goalCategoryDevJunk: String { t(.goalCategoryDevJunk) }
+    static var goalCategoryOther: String { t(.goalCategoryOther) }
+    static var goalPriorityHigh: String { t(.goalPriorityHigh) }
+    static var goalPriorityMedium: String { t(.goalPriorityMedium) }
+    static var goalPriorityLow: String { t(.goalPriorityLow) }
+    static func goalCollectorQueued(_ count: Int) -> String { String(format: t(.goalCollectorQueued), count) }
+    static var goalWithCollector: String { t(.goalWithCollector) }
+    static var goalStillNeed: String { t(.goalStillNeed) }
+
+    static func goalCategoryTitle(_ category: GoalSuggestionCategory) -> String {
+        switch category {
+        case .cache: return goalCategoryCache
+        case .logs: return goalCategoryLogs
+        case .trash: return goalCategoryTrash
+        case .installers: return goalCategoryInstallers
+        case .oldDownloads: return goalCategoryOldDownloads
+        case .largeDownloads: return goalCategoryLargeDownloads
+        case .oldFiles: return goalCategoryOldFiles
+        case .devJunk: return goalCategoryDevJunk
+        case .other: return goalCategoryOther
+        }
+    }
 
     // Export
     static var exportCSV: String { t(.exportCSV) }

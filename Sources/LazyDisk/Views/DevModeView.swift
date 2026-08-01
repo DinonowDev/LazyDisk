@@ -10,6 +10,7 @@ struct DevModeView: View {
     @EnvironmentObject var viewModel: DiskBrowserViewModel
     @State private var groupMode: DevJunkGroupMode = .project
     @State private var ecosystemFilter: DevJunkEcosystem?
+    @State private var sortOrder: DevJunkSortOrder = .sizeDescending
     @State private var expandedGroups: Set<String> = []
 
     private var items: [DevJunkItem] { viewModel.devJunkItems }
@@ -21,6 +22,10 @@ struct DevModeView: View {
 
     private var collectedCount: Int {
         items.filter { viewModel.isInCollector(url: $0.url) }.count
+    }
+
+    private var queuedItems: [DevJunkItem] {
+        items.filter { viewModel.isInCollector(url: $0.url) }
     }
 
     var body: some View {
@@ -59,8 +64,11 @@ struct DevModeView: View {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 14) {
                         summaryCard
+                        if !queuedItems.isEmpty {
+                            selectedStrip
+                        }
                         filterBar
-                        groupModePicker
+                        controlsRow
                         listContent
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,10 +87,78 @@ struct DevModeView: View {
             expandedGroups = Set(groupedByProject.keys)
         }
         .onAppear {
+            viewModel.syncDevJunkDisplay()
             if expandedGroups.isEmpty {
                 expandedGroups = Set(groupedByProject.keys)
             }
         }
+    }
+
+    // MARK: - Selected strip
+
+    private var selectedStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(L10n.devSelectedTitle, systemImage: "trash.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.red.opacity(0.85))
+                Spacer()
+                Text(ByteFormatter.string(from: queuedItems.reduce(0) { $0 + $1.size }))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Text(L10n.devCollectorCount(queuedItems.count))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(queuedItems) { item in
+                        selectedChip(item)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.red.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.red.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    private func selectedChip(_ item: DevJunkItem) -> some View {
+        HStack(spacing: 4) {
+            Text(item.name)
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
+            if let project = item.projectName {
+                Text("· \(project)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    viewModel.removeFromCollector(url: item.url)
+                }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red.opacity(0.8))
+            }
+            .buttonStyle(.plain)
+            .help(L10n.removeFromCollector)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            Capsule().fill(Color.red.opacity(0.1))
+        )
+        .overlay(Capsule().strokeBorder(Color.red.opacity(0.2), lineWidth: 1))
     }
 
     @ViewBuilder
@@ -206,6 +282,50 @@ struct DevModeView: View {
         .labelsHidden()
     }
 
+    private var controlsRow: some View {
+        HStack(spacing: 10) {
+            groupModePicker
+
+            Menu {
+                ForEach(DevJunkSortOrder.allCases) { order in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { sortOrder = order }
+                    } label: {
+                        HStack {
+                            Text(L10n.devSortTitle(order))
+                            if sortOrder == order {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(L10n.devSortTitle(sortOrder))
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+    }
+
     // MARK: - Grouped lists
 
     private var groupedByProject: [String: [DevJunkItem]] {
@@ -217,41 +337,44 @@ struct DevModeView: View {
     }
 
     private var projectGroupedList: some View {
-        let groups = groupedByProject.sorted { lhs, rhs in
-            lhs.value.reduce(0) { $0 + $1.size } > rhs.value.reduce(0) { $0 + $1.size }
-        }
+        let groups = sortOrder.sortProjectGroups(
+            groupedByProject.map { (key: $0.key, items: $0.value) }
+        )
 
         return LazyVStack(spacing: 8) {
-            ForEach(groups, id: \.key) { key, groupItems in
+            ForEach(groups, id: \.key) { group in
                 groupSection(
-                    key: key,
-                    title: groupTitle(for: key, items: groupItems),
-                    subtitle: groupSubtitle(items: groupItems),
-                    icon: groupIcon(for: key, items: groupItems),
-                    items: groupItems.sorted { $0.size > $1.size }
+                    key: group.key,
+                    title: groupTitle(for: group.key, items: group.items),
+                    subtitle: groupSubtitle(items: group.items),
+                    icon: groupIcon(for: group.key, items: group.items),
+                    items: group.items
                 )
             }
         }
     }
 
     private var typeGroupedList: some View {
-        let order: [DevJunkPurpose] = [
+        let purposeOrder: [DevJunkPurpose] = [
             .dependencies, .buildOutput, .buildCache, .devServerCache,
             .testCache, .languageCache, .packageManager, .runtimeData, .tooling
         ]
-        let groups = order.compactMap { purpose -> (DevJunkPurpose, [DevJunkItem])? in
+        let baseGroups = purposeOrder.compactMap { purpose -> (DevJunkPurpose, [DevJunkItem])? in
             guard let items = groupedByPurpose[purpose], !items.isEmpty else { return nil }
-            return (purpose, items.sorted { $0.size > $1.size })
+            return (purpose, items)
         }
+        let groups = sortOrder.sortPurposeGroups(
+            baseGroups.map { (purpose: $0.0, items: $0.1) }
+        )
 
         return LazyVStack(spacing: 8) {
-            ForEach(groups, id: \.0) { purpose, groupItems in
+            ForEach(groups, id: \.purpose) { group in
                 groupSection(
-                    key: purpose.rawValue,
-                    title: L10n.devPurposeName(purpose),
-                    subtitle: L10n.devPurposeDesc(purpose),
-                    icon: purpose.icon,
-                    items: groupItems
+                    key: group.purpose.rawValue,
+                    title: L10n.devPurposeName(group.purpose),
+                    subtitle: L10n.devPurposeDesc(group.purpose),
+                    icon: group.purpose.icon,
+                    items: group.items
                 )
             }
         }
@@ -411,6 +534,7 @@ struct DevModeView: View {
                 )
         )
         .animation(.easeInOut(duration: 0.2), value: isAdded)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.collectorItems.count)
     }
 
     private func badge(text: String, color: Color) -> some View {

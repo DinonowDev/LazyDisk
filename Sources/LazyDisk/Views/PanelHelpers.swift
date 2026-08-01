@@ -75,18 +75,19 @@ struct CollectorToggleButton: View {
     let url: URL
     var size: CGFloat = 22
 
-    private var isAdded: Bool { viewModel.isInCollector(url: url) }
-
     var body: some View {
+        let isAdded = viewModel.isInCollector(url: url)
+
         Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 viewModel.toggleCollector(url: url)
             }
         } label: {
-            Image(systemName: isAdded ? "checkmark.circle.fill" : "plus.circle")
+            Image(systemName: isAdded ? "minus.circle.fill" : "plus.circle.fill")
                 .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(isAdded ? Color.green : Color.accentColor)
+                .foregroundStyle(isAdded ? Color.red.opacity(0.9) : Color.accentColor)
                 .frame(width: size + 4, height: size + 4)
+                .scaleEffect(isAdded ? 1.05 : 1)
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isAdded)
         }
         .buttonStyle(.plain)

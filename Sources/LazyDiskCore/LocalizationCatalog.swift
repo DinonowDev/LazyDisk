@@ -17,6 +17,11 @@ public enum StringKey: String, CaseIterable {
     case cleanupTitle, cleanupEmpty, cleanupAddAll, cleanupScan
     case dupTitle, dupScan, dupEmpty, dupKeep, dupDelete
     case historyTitle, historyEmpty, historyDiff, historyGrowth, historySaved
+    case historyEmptyDesc, historySnapshotsCount, historyCompareCurrent, historyComparePrevious
+    case historyNetDelta, historyPathsChanged, historyRootWarning, historyDeleteSnapshot
+    case historyRescan, historyTopItems, historyTimeline, historyDetails, historySearchPlaceholder
+    case historyFilterAll, historyNoChanges, historySincePrevious, historyTrackedSize, historyUsageTrend
+    case historyOpenPath, historyChangesTitle, historySnapshotDetail
     case devTitle, devScan, devEmpty, devEmptyDesc, devReclaimable
     case devItemsLabel, devProjectsLabel, devGlobalLabel, devSummarySubtitle
     case devFilterAll, devGroupByProject, devGroupByType, devGlobalCaches, devGlobalCachesDesc, devItemsCount, devModifiedFmt
@@ -34,8 +39,15 @@ public enum StringKey: String, CaseIterable {
     case devDescBowerComponents, devDescParcelCache, devDescNuxt, devDescOutput, devDescCmakeDebug
     case devDescCmakeRelease, devDescSwiftpm, devDescPackageResolved, devDescGoPkgMod, devDescHomebrewCache
     case devDescDockerData, devDescGradleGlobal, devDescCargoDir, devDescGeneric
-    case devInCollector, devCollectorCount
+    case devInCollector, devCollectorCount, devSelectedTitle
+    case devSortProjectAsc, devSortProjectDesc, devSortEcoAsc, devSortPurposeAsc
     case goalTitle, goalTarget, goalSuggest, goalProgress
+    case goalScanning, goalAddAll, goalSelectedTitle, goalProjectedFree
+    case goalSuggestionsTotal, goalScanHint, goalSuggestionsTitle, goalDaysUnused
+    case goalCategoryCache, goalCategoryLogs, goalCategoryTrash, goalCategoryInstallers
+    case goalCategoryOldDownloads, goalCategoryLargeDownloads, goalCategoryOldFiles, goalCategoryDevJunk
+    case goalCategoryOther, goalPriorityHigh, goalPriorityMedium, goalPriorityLow
+    case goalCollectorQueued, goalWithCollector, goalStillNeed
     case exportCSV, exportJSON, exportDone
     case recentFolders, bookmarks, addBookmark, removeBookmark
     case menuBarFree, menuBarUsed, menuBarOpen
@@ -192,6 +204,27 @@ public struct LocalizationCatalog {
         .historyDiff: ml(en: "Since last scan", fa: "از آخرین اسکن", zh: "自上次扫描", fr: "Depuis dernier scan", ar: "منذ آخر فحص", tr: "Son taramadan"),
         .historyGrowth: ml(en: "+%@ added", fa: "+%@ اضافه", zh: "+%@ 增加", fr: "+%@ ajouté", ar: "+%@ مضاف", tr: "+%@ eklendi"),
         .historySaved: ml(en: "Snapshot saved", fa: "ذخیره شد", zh: "已保存", fr: "Enregistré", ar: "تم الحفظ", tr: "Kaydedildi"),
+        .historyEmptyDesc: ml(en: "Complete a full volume scan to capture your first snapshot. Each rescan adds a new entry you can compare over time.", fa: "یک اسکن کامل ولوم انجام دهید تا اولین اسنپ‌شات ذخیره شود. هر اسکن مجدد یک ورودی جدید برای مقایسه اضافه می‌کند.", zh: "完成一次完整卷扫描以捕获第一个快照。每次重新扫描都会添加可比较的新条目。", fr: "Effectuez une analyse complète du volume pour capturer votre premier instantané. Chaque nouvelle analyse ajoute une entrée comparable.", ar: "أكمل فحصاً كاملاً للحجم لالتقاط أول لقطة. كل فحص جديد يضيف إدخالاً للمقارنة.", tr: "İlk anlık görüntüyü yakalamak için tam bir birim taraması yapın. Her yeniden tarama karşılaştırılabilir yeni bir giriş ekler."),
+        .historySnapshotsCount: ml(en: "%d snapshots", fa: "%d اسنپ‌شات", zh: "%d 个快照", fr: "%d instantanés", ar: "%d لقطات", tr: "%d anlık görüntü"),
+        .historyCompareCurrent: ml(en: "vs Now", fa: "نسبت به الان", zh: "对比当前", fr: "vs maintenant", ar: "مقابل الآن", tr: "şimdiye göre"),
+        .historyComparePrevious: ml(en: "vs Previous", fa: "نسبت به قبلی", zh: "对比上次", fr: "vs précédent", ar: "مقابل السابق", tr: "öncekine göre"),
+        .historyNetDelta: ml(en: "Net change", fa: "تغییر خالص", zh: "净变化", fr: "Variation nette", ar: "التغيير الصافي", tr: "Net değişim"),
+        .historyPathsChanged: ml(en: "%d paths", fa: "%d مسیر", zh: "%d 个路径", fr: "%d chemins", ar: "%d مسار", tr: "%d yol"),
+        .historyRootWarning: ml(en: "You're viewing a subfolder. Switch to the volume root for an accurate comparison.", fa: "در زیرپوشه هستید. برای مقایسه دقیق به ریشه ولوم بروید.", zh: "您正在查看子文件夹。切换到卷根目录以进行准确比较。", fr: "Vous consultez un sous-dossier. Allez à la racine du volume pour une comparaison précise.", ar: "أنت تعرض مجلداً فرعياً. انتقل إلى جذر الحجم لمقارنة دقيقة.", tr: "Alt klasördesiniz. Doğru karşılaştırma için birim köküne gidin."),
+        .historyDeleteSnapshot: ml(en: "Delete snapshot", fa: "حذف اسنپ‌شات", zh: "删除快照", fr: "Supprimer l'instantané", ar: "حذف اللقطة", tr: "Anlık görüntüyü sil"),
+        .historyRescan: ml(en: "Rescan volume", fa: "اسکن مجدد ولوم", zh: "重新扫描卷", fr: "Réanalyser le volume", ar: "إعادة فحص الحجم", tr: "Birimi yeniden tara"),
+        .historyTopItems: ml(en: "Largest at scan", fa: "بزرگ‌ترین‌ها در اسکن", zh: "扫描时最大项", fr: "Plus gros à l'analyse", ar: "الأكبر عند الفحص", tr: "Taramadaki en büyükler"),
+        .historyTimeline: ml(en: "Timeline", fa: "خط زمانی", zh: "时间线", fr: "Chronologie", ar: "الجدول الزمني", tr: "Zaman çizelgesi"),
+        .historyDetails: ml(en: "Changes", fa: "تغییرات", zh: "变化", fr: "Modifications", ar: "التغييرات", tr: "Değişiklikler"),
+        .historySearchPlaceholder: ml(en: "Filter paths…", fa: "فیلتر مسیر…", zh: "筛选路径…", fr: "Filtrer chemins…", ar: "تصفية المسارات…", tr: "Yolları filtrele…"),
+        .historyFilterAll: ml(en: "All", fa: "همه", zh: "全部", fr: "Tout", ar: "الكل", tr: "Tümü"),
+        .historyNoChanges: ml(en: "No changes detected", fa: "تغییری شناسایی نشد", zh: "未检测到变化", fr: "Aucun changement", ar: "لا تغييرات", tr: "Değişiklik yok"),
+        .historySincePrevious: ml(en: "Since previous scan", fa: "از اسکن قبلی", zh: "自上次扫描", fr: "Depuis l'analyse précédente", ar: "منذ الفحص السابق", tr: "Önceki taramadan beri"),
+        .historyTrackedSize: ml(en: "Tracked data", fa: "داده ردیابی‌شده", zh: "跟踪数据", fr: "Données suivies", ar: "البيانات المتتبعة", tr: "İzlenen veri"),
+        .historyUsageTrend: ml(en: "Usage trend", fa: "روند مصرف", zh: "使用趋势", fr: "Tendance d'utilisation", ar: "اتجاه الاستخدام", tr: "Kullanım eğilimi"),
+        .historyOpenPath: ml(en: "Open in browser", fa: "باز کردن در مرورگر", zh: "在浏览器中打开", fr: "Ouvrir dans le navigateur", ar: "فتح في المتصفح", tr: "Tarayıcıda aç"),
+        .historyChangesTitle: ml(en: "What changed", fa: "چه چیزی تغییر کرد", zh: "变化内容", fr: "Ce qui a changé", ar: "ما الذي تغير", tr: "Ne değişti"),
+        .historySnapshotDetail: ml(en: "Snapshot overview", fa: "خلاصه اسنپ‌شات", zh: "快照概览", fr: "Aperçu de l'instantané", ar: "نظرة على اللقطة", tr: "Anlık görüntü özeti"),
         .devTitle: ml(en: "Developer Junk", fa: "زباله توسعه", zh: "开发垃圾", fr: "Déchets dev", ar: "ملفات التطوير", tr: "Geliştirici çöpü"),
         .devScan: ml(en: "Scan dev folders", fa: "اسکن dev", zh: "扫描开发目录", fr: "Scanner dev", ar: "فحص dev", tr: "Dev tara"),
         .devEmpty: ml(en: "No dev junk found", fa: "چیزی نیست", zh: "未找到", fr: "Rien trouvé", ar: "لا شيء", tr: "Bulunamadı"),
@@ -280,10 +313,38 @@ public struct LocalizationCatalog {
         .devDescGeneric: ml(en: "Development artifact folder", fa: "فولدر آرتیفکت توسعه", zh: "开发产物文件夹", fr: "Dossier d'artefacts de développement", ar: "مجلد مخرجات التطوير", tr: "Geliştirme çıktısı klasörü"),
         .devInCollector: ml(en: "In Collector", fa: "در سطل", zh: "已加入收集器", fr: "Dans le collecteur", ar: "في المجمع", tr: "Toplayıcıda"),
         .devCollectorCount: ml(en: "%d in Collector", fa: "%d در سطل", zh: "%d 项在收集器", fr: "%d dans le collecteur", ar: "%d في المجمع", tr: "%d toplayıcıda"),
+        .devSelectedTitle: ml(en: "Queued for cleanup", fa: "در صف حذف", zh: "待清理", fr: "En file pour nettoyage", ar: "في قائمة التنظيف", tr: "Temizlik için sıraya alındı"),
+        .devSortProjectAsc: ml(en: "Project A→Z", fa: "پروژه الف→ی", zh: "项目 A→Z", fr: "Projet A→Z", ar: "المشروع أ→ي", tr: "Proje A→Z"),
+        .devSortProjectDesc: ml(en: "Project Z→A", fa: "پروژه ی→الف", zh: "项目 Z→A", fr: "Projet Z→A", ar: "المشروع ي→أ", tr: "Proje Z→A"),
+        .devSortEcoAsc: ml(en: "Language / stack", fa: "زبان / استک", zh: "语言/技术栈", fr: "Langage / stack", ar: "اللغة / المكدس", tr: "Dil / stack"),
+        .devSortPurposeAsc: ml(en: "Type (deps, build…)", fa: "نوع (وابستگی، build…)", zh: "类型（依赖、构建…）", fr: "Type (deps, build…)", ar: "النوع (تبعيات، بناء…)", tr: "Tür (bağımlılık, build…)"),
         .goalTitle: ml(en: "Free Space Goal", fa: "هدف آزادسازی", zh: "释放目标", fr: "Objectif d'espace", ar: "هدف المساحة", tr: "Boş alan hedefi"),
         .goalTarget: ml(en: "Target to free", fa: "هدف آزادسازی", zh: "目标释放", fr: "Objectif", ar: "الهدف", tr: "Hedef"),
         .goalSuggest: ml(en: "Suggest items", fa: "پیشنهاد آیتم", zh: "推荐项目", fr: "Suggérer", ar: "اقتراح", tr: "Öner"),
         .goalProgress: ml(en: "Progress", fa: "پیشرفت", zh: "进度", fr: "Progrès", ar: "التقدم", tr: "İlerleme"),
+        .goalScanning: ml(en: "Scanning for space…", fa: "در حال جستجوی فضا…", zh: "正在扫描空间…", fr: "Recherche d'espace…", ar: "جارٍ البحث عن مساحة…", tr: "Alan aranıyor…"),
+        .goalAddAll: ml(en: "Add all to Collector", fa: "افزودن همه به سطل", zh: "全部加入收集器", fr: "Tout ajouter", ar: "إضافة الكل للمجمع", tr: "Tümünü toplayıcıya ekle"),
+        .goalSelectedTitle: ml(en: "Queued for cleanup", fa: "در صف حذف", zh: "待清理", fr: "En file d'attente", ar: "في قائمة التنظيف", tr: "Temizlik kuyruğu"),
+        .goalProjectedFree: ml(en: "After cleanup", fa: "بعد پاکسازی", zh: "清理后", fr: "Après nettoyage", ar: "بعد التنظيف", tr: "Temizlikten sonra"),
+        .goalSuggestionsTotal: ml(en: "Suggestions free %@", fa: "پیشنهادها %@ آزاد می‌کنند", zh: "建议可释放 %@", fr: "Suggestions libèrent %@", ar: "الاقتراحات تحرر %@", tr: "Öneriler %@ boşaltır"),
+        .goalScanHint: ml(en: "Scans caches, old downloads, large files, and unused items ranked by safety and size.", fa: "کش، دانلودهای قدیمی، فایل‌های حجیم و موارد بلااستفاده را بر اساس امنیت و حجم اولویت‌بندی می‌کند.", zh: "按安全性和大小扫描缓存、旧下载、大文件和未使用项。", fr: "Analyse caches, anciens téléchargements et gros fichiers par priorité.", ar: "يفحص الذاكرة المؤقتة والتنزيلات القديمة والملفات الكبيرة.", tr: "Önbellek, eski indirmeler ve büyük dosyaları tarar."),
+        .goalSuggestionsTitle: ml(en: "Suggested items", fa: "آیتم‌های پیشنهادی", zh: "推荐项目", fr: "Éléments suggérés", ar: "العناصر المقترحة", tr: "Önerilen öğeler"),
+        .goalDaysUnused: ml(en: "%d days unused", fa: "%d روز استفاده نشده", zh: "%d 天未使用", fr: "%d jours sans usage", ar: "%d يوم بدون استخدام", tr: "%d gündür kullanılmadı"),
+        .goalCategoryCache: ml(en: "Cache", fa: "کش", zh: "缓存", fr: "Cache", ar: "ذاكرة مؤقتة", tr: "Önbellek"),
+        .goalCategoryLogs: ml(en: "Logs", fa: "لاگ", zh: "日志", fr: "Journaux", ar: "سجلات", tr: "Günlükler"),
+        .goalCategoryTrash: ml(en: "Trash", fa: "سطل", zh: "废纸篓", fr: "Corbeille", ar: "سلة", tr: "Çöp"),
+        .goalCategoryInstallers: ml(en: "Installers", fa: "نصب‌کننده", zh: "安装包", fr: "Installateurs", ar: "مثبتات", tr: "Kurulum dosyaları"),
+        .goalCategoryOldDownloads: ml(en: "Old Downloads", fa: "دانلودهای قدیمی", zh: "旧下载", fr: "Anciens téléchargements", ar: "تنزيلات قديمة", tr: "Eski indirmeler"),
+        .goalCategoryLargeDownloads: ml(en: "Large Downloads", fa: "دانلودهای حجیم", zh: "大下载", fr: "Gros téléchargements", ar: "تنزيلات كبيرة", tr: "Büyük indirmeler"),
+        .goalCategoryOldFiles: ml(en: "Unused Files", fa: "فایل‌های بلااستفاده", zh: "未使用文件", fr: "Fichiers inutilisés", ar: "ملفات غير مستخدمة", tr: "Kullanılmayan dosyalar"),
+        .goalCategoryDevJunk: ml(en: "Developer", fa: "توسعه‌دهنده", zh: "开发者", fr: "Développeur", ar: "مطور", tr: "Geliştirici"),
+        .goalCategoryOther: ml(en: "Other", fa: "سایر", zh: "其他", fr: "Autre", ar: "أخرى", tr: "Diğer"),
+        .goalPriorityHigh: ml(en: "Safe", fa: "ایمن", zh: "安全", fr: "Sûr", ar: "آمن", tr: "Güvenli"),
+        .goalPriorityMedium: ml(en: "Review", fa: "بررسی", zh: "需审查", fr: "À vérifier", ar: "مراجعة", tr: "İncele"),
+        .goalPriorityLow: ml(en: "Caution", fa: "احتیاط", zh: "谨慎", fr: "Prudence", ar: "حذر", tr: "Dikkat"),
+        .goalCollectorQueued: ml(en: "%d in Collector", fa: "%d در سطل", zh: "收集器 %d 项", fr: "%d dans le collecteur", ar: "%d في المجمع", tr: "Toplayıcıda %d"),
+        .goalWithCollector: ml(en: "Including Collector", fa: "شامل سطل", zh: "含收集器", fr: "Avec collecteur", ar: "يشمل المجمع", tr: "Toplayıcı dahil"),
+        .goalStillNeed: ml(en: "Still need", fa: "هنوز لازم", zh: "仍需", fr: "Encore besoin", ar: "لا يزال مطلوب", tr: "Hâlâ gerekli"),
         .exportCSV: ml(en: "Export CSV", fa: "خروجی CSV", zh: "导出CSV", fr: "Exporter CSV", ar: "تصدير CSV", tr: "CSV dışa aktar"),
         .exportJSON: ml(en: "Export JSON", fa: "خروجی JSON", zh: "导出JSON", fr: "Exporter JSON", ar: "تصدير JSON", tr: "JSON dışa aktar"),
         .exportDone: ml(en: "Export saved", fa: "ذخیره شد", zh: "已导出", fr: "Exporté", ar: "تم التصدير", tr: "Kaydedildi"),

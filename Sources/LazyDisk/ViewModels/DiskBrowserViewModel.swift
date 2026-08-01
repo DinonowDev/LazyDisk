@@ -59,6 +59,7 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var scanSnapshots: [ScanSnapshot] = []
     @Published var selectedSnapshotID: UUID?
     @Published var currentScanDiff: ScanDiff?
+    @Published var historyCompareMode: ScanHistoryCompareMode = .currentState
     private var historyLoadedVolumeID: String?
 
     // Dev mode
@@ -68,7 +69,9 @@ final class DiskBrowserViewModel: ObservableObject {
 
     // Free space goal
     @Published var freeSpaceGoalGB: Double = AppPreferences.load().freeSpaceGoalGB
-    @Published var goalSuggestions: [DiskItem] = []
+    @Published var goalSuggestions: [GoalSuggestion] = []
+    @Published var isScanningGoal = false
+    @Published var goalScanProgress: GoalScanProgress?
 
     // Navigation
     @Published var recentFolders: [URL] = NavigationHistoryService.recentFolders()
@@ -97,7 +100,9 @@ final class DiskBrowserViewModel: ObservableObject {
     private var duplicateTask: Task<Void, Never>?
     private var devTask: Task<Void, Never>?
     private var smartCollectionTask: Task<Void, Never>?
+    private var goalTask: Task<Void, Never>?
     private var navigationGeneration: UInt = 0
+    private var devJunkCache: [String: [DevJunkItem]] = [:]
     private var lastSelectedIndex: Int?
     private let scanner = DiskScanner.shared
     private let cache = ScanCache.shared
@@ -753,6 +758,7 @@ final class DiskBrowserViewModel: ObservableObject {
             scanSnapshots = []
             selectedSnapshotID = nil
             currentScanDiff = nil
+            restoreDevJunkForSelectedVolume(volumeID: volume.id)
         }
         selectedVolume = volume
         restartFilesystemMonitoring()
@@ -762,6 +768,11 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     func pickVolume(_ volume: VolumeInfo?) {
+        if let volume, selectedVolume?.id != volume.id {
+            restoreDevJunkForSelectedVolume(volumeID: volume.id)
+        } else if volume == nil {
+            devJunkItems = []
+        }
         selectedVolume = volume
         restartFilesystemMonitoring()
     }
@@ -1205,17 +1216,69 @@ final class DiskBrowserViewModel: ObservableObject {
                 self.scanSnapshots = snapshots
                 if let first {
                     self.selectedSnapshotID = first.id
-                    self.currentScanDiff = ScanHistoryDiff.computeDiff(current: self.entries, previous: first)
+                    self.currentScanDiff = self.computeScanDiff(for: first)
+                } else {
+                    self.selectedSnapshotID = nil
+                    self.currentScanDiff = nil
                 }
             }
         }
     }
 
+    var selectedScanSnapshot: ScanSnapshot? {
+        guard let selectedSnapshotID else { return nil }
+        return scanSnapshots.first { $0.id == selectedSnapshotID }
+    }
+
+    func previousScanSnapshot(before snapshot: ScanSnapshot) -> ScanSnapshot? {
+        guard let index = scanSnapshots.firstIndex(where: { $0.id == snapshot.id }) else { return nil }
+        let olderIndex = index + 1
+        guard olderIndex < scanSnapshots.count else { return nil }
+        return scanSnapshots[olderIndex]
+    }
+
+    func computeScanDiff(for snapshot: ScanSnapshot) -> ScanDiff {
+        switch historyCompareMode {
+        case .currentState:
+            return ScanHistoryDiff.computeDiff(current: entries, previous: snapshot)
+        case .previousSnapshot:
+            if let previous = previousScanSnapshot(before: snapshot) {
+                return ScanHistoryDiff.computeDiff(baseline: previous, target: snapshot)
+            }
+            return ScanHistoryDiff.computeDiff(current: entries, previous: snapshot)
+        }
+    }
+
     func updateScanDiff(with snapshot: ScanSnapshot) {
-        let diff = ScanHistoryDiff.computeDiff(current: entries, previous: snapshot)
+        let diff = computeScanDiff(for: snapshot)
         publishAfterCurrentUpdate { [weak self] in
             self?.currentScanDiff = diff
         }
+    }
+
+    func refreshScanDiff() {
+        guard let snapshot = selectedScanSnapshot else { return }
+        updateScanDiff(with: snapshot)
+    }
+
+    func deleteScanSnapshot(id: UUID) {
+        guard let volume = selectedVolume else { return }
+        Task {
+            await historyStore.deleteSnapshot(volumeID: volume.id, snapshotID: id)
+            loadScanHistory(force: true)
+        }
+    }
+
+    func openHistoryPath(_ path: String) {
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        activePanel = .browser
+        NSApp.activate(ignoringOtherApps: true)
+        navigate(to: url)
+    }
+
+    func revealHistoryPath(_ path: String) {
+        let url = URL(fileURLWithPath: path)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     private func saveScanSnapshot(volume: VolumeInfo) {
@@ -1230,19 +1293,34 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     func scanDevJunk() {
+        guard let volume = selectedVolume else { return }
         devTask?.cancel()
         isScanningDev = true
         devProgress = nil
-        let roots = selectedVolume.map { [$0.scanRoot] }
+        let roots = [volume.scanRoot]
+        let volumeID = volume.id
         devTask = Task {
-            devJunkItems = await DevModeService.scan(roots: roots) { [weak self] progress in
+            let results = await DevModeService.scan(roots: roots) { [weak self] progress in
                 DispatchQueue.main.async { self?.devProgress = progress }
             }
             guard !Task.isCancelled else { return }
+            devJunkCache[volumeID] = results
+            if selectedVolume?.id == volumeID {
+                devJunkItems = results
+            }
             isScanningDev = false
             devProgress = nil
             devTask = nil
         }
+    }
+
+    private func restoreDevJunkForSelectedVolume(volumeID: String? = nil) {
+        let id = volumeID ?? selectedVolume?.id
+        devJunkItems = id.flatMap { devJunkCache[$0] } ?? []
+    }
+
+    func syncDevJunkDisplay() {
+        restoreDevJunkForSelectedVolume()
     }
 
     func cancelDevScan() {
@@ -1268,26 +1346,63 @@ final class DiskBrowserViewModel: ObservableObject {
         prefs.save()
     }
 
+    var goalTargetBytes: Int64 {
+        Int64(freeSpaceGoalGB * 1_073_741_824)
+    }
+
+    var goalNeededBytes: Int64 {
+        guard let volume = selectedVolume else { return 0 }
+        return max(0, goalTargetBytes - projectedFreeSpace)
+    }
+
+    var goalSuggestionsTotalSize: Int64 {
+        goalSuggestions.reduce(0) { $0 + $1.size }
+    }
+
     func suggestItemsForGoal() {
         guard let volume = selectedVolume else { return }
-        let targetBytes = Int64(freeSpaceGoalGB * 1_073_741_824)
-        let needed = max(0, targetBytes - volume.availableCapacity)
+        let needed = goalNeededBytes
         guard needed > 0 else {
             goalSuggestions = []
             return
         }
 
-        var collected: [DiskItem] = []
-        var accumulated: Int64 = 0
-        let sorted = entries.filter { !$0.isVirtual && CleanupService.canDelete(url: $0.url) }
-            .sorted { $0.size > $1.size }
+        goalTask?.cancel()
+        isScanningGoal = true
+        goalScanProgress = nil
+        let excludePaths = Set(collectorItems.map { PathUtils.resolved($0.url).path })
 
-        for item in sorted {
-            collected.append(item)
-            accumulated += item.size
-            if accumulated >= needed { break }
+        goalTask = Task {
+            let suggestions = await GoalSuggestionService.scan(
+                volumeRoot: volume.scanRoot,
+                neededBytes: needed,
+                excludePaths: excludePaths
+            ) { [weak self] progress in
+                DispatchQueue.main.async { self?.goalScanProgress = progress }
+            }
+            guard !Task.isCancelled else { return }
+            goalSuggestions = suggestions
+            isScanningGoal = false
+            goalScanProgress = nil
+            goalTask = nil
         }
-        goalSuggestions = collected
+    }
+
+    func cancelGoalScan() {
+        goalTask?.cancel()
+        goalTask = nil
+        isScanningGoal = false
+        goalScanProgress = nil
+    }
+
+    func addGoalSuggestion(_ suggestion: GoalSuggestion) {
+        addToCollector(url: suggestion.url)
+    }
+
+    func addAllGoalSuggestions() {
+        for suggestion in goalSuggestions where !isInCollector(url: suggestion.url) {
+            addToCollector(url: suggestion.url)
+        }
     }
 
     func toggleBookmark() {
@@ -1350,7 +1465,13 @@ final class DiskBrowserViewModel: ObservableObject {
                let updated = vols.first(where: { $0.id == current.id }) {
                 selectedVolume = updated
             } else if selectedVolume != nil, !vols.contains(where: { $0.id == selectedVolume?.id }) {
-                selectedVolume = vols.first(where: { $0.url.path == "/" }) ?? vols.first
+                let next = vols.first(where: { $0.url.path == "/" }) ?? vols.first
+                if let next {
+                    restoreDevJunkForSelectedVolume(volumeID: next.id)
+                } else {
+                    devJunkItems = []
+                }
+                selectedVolume = next
                 restartFilesystemMonitoring()
             }
         }

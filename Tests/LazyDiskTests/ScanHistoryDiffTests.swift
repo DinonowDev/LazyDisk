@@ -41,4 +41,16 @@ final class ScanHistoryDiffTests: XCTestCase {
         XCTAssertEqual(diff.removedBytes, 500)
         XCTAssertEqual(diff.addedBytes, 0)
     }
+
+    func testSnapshotFilenameEscapesVolumePath() {
+        let id = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+        XCTAssertEqual(
+            ScanHistoryPaths.snapshotFilename(volumeID: "/", snapshotID: id),
+            "root-00000000-0000-4000-8000-000000000001.json"
+        )
+        XCTAssertEqual(
+            ScanHistoryPaths.snapshotFilename(volumeID: "/Volumes/MyDisk", snapshotID: id),
+            "Volumes--MyDisk-00000000-0000-4000-8000-000000000001.json"
+        )
+    }
 }

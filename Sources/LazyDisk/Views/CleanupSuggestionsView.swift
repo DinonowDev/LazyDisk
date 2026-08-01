@@ -43,11 +43,7 @@ struct CleanupSuggestionsView: View {
                             Spacer()
                             Text(ByteFormatter.string(from: suggestion.size))
                                 .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            Button { viewModel.addCleanupSuggestion(suggestion) } label: {
-                                Image(systemName: "plus.circle.fill")
-                            }
-                            .buttonStyle(.plain)
-                            .help(L10n.addToCollector)
+                            CollectorToggleButton(url: suggestion.url, size: 20)
                         }
                         .padding(.vertical, 4)
                     }

@@ -75,4 +75,28 @@ final class DevJunkMetadataTests: XCTestCase {
         XCTAssertEqual(item.projectPath?.path, project.path)
         XCTAssertEqual(item.ecosystem, .javascript)
     }
+
+    func testSortBySizeDescending() {
+        let items = [
+            makeItem(name: "small", size: 10),
+            makeItem(name: "large", size: 100),
+        ]
+        let sorted = DevJunkSortOrder.sizeDescending.sort(items)
+        XCTAssertEqual(sorted.map(\.name), ["large", "small"])
+    }
+
+    private func makeItem(name: String, size: Int64) -> DevJunkItem {
+        DevJunkItem(
+            url: URL(fileURLWithPath: "/tmp/\(name)"),
+            name: name,
+            size: size,
+            folderKind: .build,
+            ecosystem: .general,
+            purpose: .buildOutput,
+            safety: .rebuild,
+            projectName: nil,
+            projectPath: nil,
+            modifiedAt: nil
+        )
+    }
 }

@@ -65,9 +65,39 @@ public struct ScanDiff: Sendable {
     public let addedBytes: Int64
     public let removedBytes: Int64
     public let netDelta: Int64
+    public let addedCount: Int
+    public let removedCount: Int
+    public let changedCount: Int
     public let addedPaths: [PathChange]
     public let removedPaths: [PathChange]
     public let changedPaths: [PathChange]
+
+    public var totalChangeCount: Int { addedCount + removedCount + changedCount }
+    public var isEmpty: Bool { totalChangeCount == 0 }
+}
+
+public struct SnapshotAnalytics: Sendable {
+    public let trackedBytes: Int64
+    public let topEntries: [SnapshotEntry]
+
+    public static func analyze(_ snapshot: ScanSnapshot, topN: Int = 8) -> SnapshotAnalytics {
+        let tracked = snapshot.entries.reduce(Int64(0)) { $0 + $1.size }
+        let top = snapshot.entries.sorted { $0.size > $1.size }.prefix(topN)
+        return SnapshotAnalytics(trackedBytes: tracked, topEntries: Array(top))
+    }
+}
+
+public enum ScanHistoryPaths {
+    /// Safe single path-component prefix for a volume mount path (e.g. "/" → "root").
+    public static func filenamePrefix(for volumeID: String) -> String {
+        if volumeID == "/" { return "root" }
+        return String(volumeID.drop(while: { $0 == "/" }))
+            .replacingOccurrences(of: "/", with: "--")
+    }
+
+    public static func snapshotFilename(volumeID: String, snapshotID: UUID) -> String {
+        "\(filenamePrefix(for: volumeID))-\(snapshotID.uuidString).json"
+    }
 }
 
 public enum ScanHistoryDiff {
@@ -75,7 +105,23 @@ public enum ScanHistoryDiff {
         let currentItems = current.filter { !$0.isVirtual }
         let currentMap = Dictionary(uniqueKeysWithValues: currentItems.map { ($0.url.path, $0.size) })
         let prevMap = Dictionary(uniqueKeysWithValues: previous.entries.map { ($0.path, $0.size) })
+        return buildDiff(currentMap: currentMap, previousMap: prevMap)
+    }
 
+    public static func computeDiff(baseline: ScanSnapshot, target: ScanSnapshot) -> ScanDiff {
+        let baselineMap = Dictionary(uniqueKeysWithValues: baseline.entries.map { ($0.path, $0.size) })
+        let targetMap = Dictionary(uniqueKeysWithValues: target.entries.map { ($0.path, $0.size) })
+        return buildDiff(currentMap: targetMap, previousMap: baselineMap)
+    }
+
+    public static func usageDelta(from older: ScanSnapshot, to newer: ScanSnapshot) -> Int64 {
+        newer.totalUsed - older.totalUsed
+    }
+
+    private static func buildDiff(
+        currentMap: [String: Int64],
+        previousMap: [String: Int64]
+    ) -> ScanDiff {
         var addedBytes: Int64 = 0
         var removedBytes: Int64 = 0
         var added: [PathChange] = []
@@ -83,7 +129,7 @@ public enum ScanHistoryDiff {
         var changed: [PathChange] = []
 
         for (path, size) in currentMap {
-            if let prev = prevMap[path] {
+            if let prev = previousMap[path] {
                 let delta = size - prev
                 if delta != 0 {
                     changed.append(PathChange(id: path, path: path, delta: delta, newSize: size))
@@ -94,7 +140,7 @@ public enum ScanHistoryDiff {
             }
         }
 
-        for (path, size) in prevMap where currentMap[path] == nil {
+        for (path, size) in previousMap where currentMap[path] == nil {
             removedBytes += size
             removed.append(PathChange(id: path, path: path, delta: -size, newSize: nil))
         }
@@ -107,6 +153,9 @@ public enum ScanHistoryDiff {
             addedBytes: addedBytes,
             removedBytes: removedBytes,
             netDelta: addedBytes - removedBytes,
+            addedCount: added.count,
+            removedCount: removed.count,
+            changedCount: changed.count,
             addedPaths: Array(added.prefix(100)),
             removedPaths: Array(removed.prefix(100)),
             changedPaths: Array(changed.prefix(200))
