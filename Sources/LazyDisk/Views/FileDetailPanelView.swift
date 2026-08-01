@@ -78,42 +78,65 @@ struct FileDetailPanelView: View {
     private var actionsSection: some View {
         VStack(spacing: 8) {
             if item.isDirectory && !item.isVirtual {
-                Button { viewModel.openItem(item) } label: {
-                    Label(L10n.detailOpenFolder, systemImage: "folder.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                detailActionButton(
+                    title: L10n.detailOpenFolder,
+                    icon: "folder.fill",
+                    prominent: true,
+                    action: { viewModel.openItem(item) }
+                )
 
-                Button { viewModel.showLargeFilesInFolder(item) } label: {
-                    Label(L10n.detailShowLargeFiles, systemImage: "doc.fill.badge.ellipsis")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                detailActionButton(
+                    title: L10n.detailShowLargeFiles,
+                    icon: "doc.fill.badge.ellipsis",
+                    action: { viewModel.showLargeFilesInFolder(item) }
+                )
             }
 
             HStack(spacing: 8) {
-                Button { viewModel.revealInFinder(item) } label: {
-                    Label(L10n.revealFinder, systemImage: "folder")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                detailActionButton(
+                    title: L10n.revealFinder,
+                    icon: "folder",
+                    action: { viewModel.revealInFinder(item) }
+                )
 
-                Button { QuickLookService.preview(urls: [item.url]) } label: {
-                    Label(L10n.quickLook, systemImage: "eye")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                detailActionButton(
+                    title: L10n.quickLook,
+                    icon: "eye",
+                    action: { QuickLookService.preview(urls: [item.url]) }
+                )
             }
 
-            Button { viewModel.addToCollector(item) } label: {
-                Label(L10n.addToCollector, systemImage: "plus.circle.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            detailActionButton(
+                title: L10n.addToCollector,
+                icon: "plus.circle.fill",
+                action: { viewModel.addToCollector(item) }
+            )
             .disabled(item.isVirtual)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func detailActionButton(
+        title: String,
+        icon: String,
+        prominent: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        let label = Label(title, systemImage: icon)
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .frame(maxWidth: .infinity)
+
+        if prominent {
+            Button(action: action) { label }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+        } else {
+            Button(action: action) { label }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
         }
     }
 

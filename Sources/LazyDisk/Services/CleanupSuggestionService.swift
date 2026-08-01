@@ -42,19 +42,24 @@ enum CleanupSuggestionService {
             ("Spotify cache", "Spotify offline cache", home.appendingPathComponent("Library/Caches/com.spotify.client")),
         ]
 
-        var tasks: [(String, () async -> CleanupSuggestion?)] = []
+        var tasks: [(String, () async -> [CleanupSuggestion])] = []
 
         for (name, reason, url) in knownTargets {
             tasks.append((name, {
-                guard fm.fileExists(atPath: url.path) else { return nil }
+                guard fm.fileExists(atPath: url.path) else { return [] }
                 let size = await scanner.calculateSize(for: url)
-                guard size >= minSuggestionSize else { return nil }
-                return CleanupSuggestion(url: url, name: name, category: reason, reason: reason, size: size, score: 80)
+                guard size >= minSuggestionSize else { return [] }
+                let suggestion = CleanupSuggestion(url: url, name: name, category: reason, reason: reason, size: size, score: 80)
+                return [suggestion]
             }))
         }
 
         tasks.append(("Desktop", {
-            await scanOldLargeFiles(in: home.appendingPathComponent("Desktop"), label: "Large desktop files", minAge: oldFileDays, minSize: 50 * 1024 * 1024)
+            await scanOldLargeFiles(
+                in: home.appendingPathComponent("Desktop"),
+                minAge: oldFileDays,
+                minFileSize: 50 * 1024 * 1024
+            )
         }))
 
         tasks.append(("Installers", {
@@ -62,11 +67,17 @@ enum CleanupSuggestionService {
         }))
 
         tasks.append(("Cache subdirs", {
-            await scanLargeCacheSubdirs(in: home.appendingPathComponent("Library/Caches"))
+            if let suggestion = await scanLargeCacheSubdirs(in: home.appendingPathComponent("Library/Caches")) {
+                return [suggestion]
+            }
+            return []
         }))
 
         tasks.append(("Log subdirs", {
-            await scanLargeCacheSubdirs(in: home.appendingPathComponent("Library/Logs"))
+            if let suggestion = await scanLargeCacheSubdirs(in: home.appendingPathComponent("Library/Logs")) {
+                return [suggestion]
+            }
+            return []
         }))
 
         if PathUtils.isWithinVolume(home, scanRoot: volumeRoot) || volumeRoot.path == "/" {
@@ -74,7 +85,10 @@ enum CleanupSuggestionService {
             let systemCaches = URL(fileURLWithPath: "/Library/Caches", isDirectory: true)
             if fm.isReadableFile(atPath: systemCaches.path) {
                 tasks.append(("System caches", {
-                    await scanLargeCacheSubdirs(in: systemCaches)
+                    if let suggestion = await scanLargeCacheSubdirs(in: systemCaches) {
+                        return [suggestion]
+                    }
+                    return []
                 }))
             }
         }
@@ -83,9 +97,7 @@ enum CleanupSuggestionService {
         for (index, (label, task)) in tasks.enumerated() {
             if Task.isCancelled { break }
             onProgress?(CleanupScanProgress(currentTask: label, completed: index, total: total, fraction: Double(index) / Double(max(total, 1))))
-            if let suggestion = await task() {
-                results.append(suggestion)
-            }
+            results.append(contentsOf: await task())
         }
 
         onProgress?(CleanupScanProgress(currentTask: "", completed: total, total: total, fraction: 1))
@@ -94,67 +106,63 @@ enum CleanupSuggestionService {
             .sorted { ($0.score, $0.size) > ($1.score, $1.size) }
     }
 
-    private static func scanOldLargeFiles(in folder: URL, label: String, minAge: TimeInterval, minSize: Int64) async -> CleanupSuggestion? {
-        guard FileManager.default.fileExists(atPath: folder.path) else { return nil }
+    private static func scanOldLargeFiles(
+        in folder: URL,
+        minAge: TimeInterval,
+        minFileSize: Int64
+    ) async -> [CleanupSuggestion] {
+        guard FileManager.default.fileExists(atPath: folder.path) else { return [] }
         let cutoff = Date().addingTimeInterval(-minAge)
-        var totalSize: Int64 = 0
-        var oldCount = 0
+        let minAgeDays = Int(minAge / 86_400)
 
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
-        ) else { return nil }
+        ) else { return [] }
 
-        for url in contents {
+        return contents.compactMap { url in
             let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey])
-            guard values?.isRegularFile == true else { continue }
+            guard values?.isRegularFile == true else { return nil }
             let mod = values?.contentModificationDate ?? .distantFuture
             let size = Int64(values?.fileSize ?? 0)
-            if mod < cutoff && size > 0 {
-                totalSize += size
-                oldCount += 1
-            }
+            guard mod < cutoff, size >= minFileSize else { return nil }
+            return CleanupSuggestion(
+                url: url,
+                name: url.lastPathComponent,
+                category: "Aging files",
+                reason: "Older than \(minAgeDays) days",
+                size: size,
+                score: 70
+            )
         }
-
-        guard totalSize >= minSize else { return nil }
-        return CleanupSuggestion(
-            url: folder,
-            name: label,
-            category: "Aging files",
-            reason: "\(oldCount) files older than \(Int(minAge / 86_400)) days",
-            size: totalSize,
-            score: 70
-        )
     }
 
-    private static func scanInstallers(in folder: URL) async -> CleanupSuggestion? {
-        guard FileManager.default.fileExists(atPath: folder.path) else { return nil }
+    private static func scanInstallers(in folder: URL) async -> [CleanupSuggestion] {
+        guard FileManager.default.fileExists(atPath: folder.path) else { return [] }
         let extensions = Set(["dmg", "pkg", "iso", "zip"])
-        var totalSize: Int64 = 0
-        var count = 0
 
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: folder,
-            includingPropertiesForKeys: [.fileSizeKey],
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
-        ) else { return nil }
+        ) else { return [] }
 
-        for url in contents where extensions.contains(url.pathExtension.lowercased()) {
-            let size = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-            totalSize += size
-            count += 1
+        return contents.compactMap { url in
+            guard extensions.contains(url.pathExtension.lowercased()) else { return nil }
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard values?.isRegularFile == true else { return nil }
+            let size = Int64(values?.fileSize ?? 0)
+            guard size >= minSuggestionSize else { return nil }
+            return CleanupSuggestion(
+                url: url,
+                name: url.lastPathComponent,
+                category: "Installers",
+                reason: "Installer in Downloads",
+                size: size,
+                score: 75
+            )
         }
-
-        guard totalSize >= minSuggestionSize else { return nil }
-        return CleanupSuggestion(
-            url: folder,
-            name: "Installers",
-            category: "Installers",
-            reason: "\(count) DMG/PKG/ISO files in Downloads",
-            size: totalSize,
-            score: 75
-        )
     }
 
     private static func scanLargeCacheSubdirs(in cachesRoot: URL) async -> CleanupSuggestion? {

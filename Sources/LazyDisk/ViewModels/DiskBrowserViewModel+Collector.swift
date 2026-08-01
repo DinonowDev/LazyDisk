@@ -42,7 +42,15 @@ extension DiskBrowserViewModel {
             return
         }
 
-        let provisional = DiskItem(url: resolved, isDirectory: resolved.hasDirectoryPath, isScanning: true)
+        let values = try? resolved.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .fileSizeKey])
+        let isDirectory = values?.isDirectory == true
+        if values?.isRegularFile == true {
+            let size = Int64(values?.fileSize ?? 0)
+            addToCollector(DiskItem(url: resolved, size: size, isDirectory: false))
+            return
+        }
+
+        let provisional = DiskItem(url: resolved, isDirectory: isDirectory, isScanning: true)
         addToCollector(provisional)
 
         Task {

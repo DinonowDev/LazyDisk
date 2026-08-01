@@ -68,12 +68,15 @@ struct ContentView: View {
         HSplitView {
             mainPanel
                 .frame(minWidth: 520)
+                .layoutPriority(1)
 
             VStack(spacing: 0) {
                 recentBookmarksBar
                 FolderSidebarView()
             }
-            .frame(minWidth: 340, idealWidth: viewModel.browserSidebarWidth, maxWidth: 520)
+            .frame(width: viewModel.browserSidebarWidth)
+            .frame(minWidth: 280, maxWidth: 480)
+            .layoutPriority(0)
             .trackPanelWidth { viewModel.saveSidebarWidth($0) }
         }
     }
@@ -230,8 +233,7 @@ struct ContentView: View {
 
     private var mainPanel: some View {
         chartPanel
-            .id(viewModel.navigationAnimationID)
-            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .animation(.easeInOut(duration: 0.25), value: viewModel.navigationAnimationID)
     }
 
     private var chartPanel: some View {

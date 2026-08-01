@@ -7,6 +7,7 @@ extension DiskBrowserViewModel {
     // MARK: - Navigation
 
     func selectVolume(_ volume: VolumeInfo) {
+        pauseSidebarWidthTracking()
         if selectedVolume?.id != volume.id {
             historyLoadedVolumeID = nil
             scanSnapshots = []
@@ -34,6 +35,7 @@ extension DiskBrowserViewModel {
     func navigate(to url: URL) {
         guard appPhase == .ready else { return }
 
+        pauseSidebarWidthTracking()
         clearSmartCollection()
         let normalized = PathUtils.resolved(url)
 
@@ -157,6 +159,7 @@ extension DiskBrowserViewModel {
 
     func selectItemForDetail(_ item: DiskItem, at index: Int? = nil) {
         guard !item.isVirtual else { return }
+        pauseSidebarWidthTracking()
         selectedIDs = [item.id]
         detailItem = item
         isDetailPanelVisible = true

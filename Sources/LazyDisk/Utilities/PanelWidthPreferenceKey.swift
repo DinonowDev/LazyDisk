@@ -16,7 +16,8 @@ extension View {
             }
         )
         .onPreferenceChange(PanelWidthPreferenceKey.self) { width in
-            if width > 0 { onChange(width) }
+            guard width > 0 else { return }
+            onChange(width)
         }
     }
 }

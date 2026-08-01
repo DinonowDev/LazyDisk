@@ -92,6 +92,10 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var isDetailPanelVisible = false
     @Published var browserSidebarWidth: CGFloat = AppPreferences.load().browserSidebarWidth
 
+    var sidebarWidthSaveTask: Task<Void, Never>?
+    var sidebarWidthTrackingResumeTask: Task<Void, Never>?
+    var isSidebarWidthTrackingPaused = false
+
     var scanTask: Task<Void, Never>?
     var prefetchTask: Task<Void, Never>?
     var chartChildRefreshTask: Task<Void, Never>?

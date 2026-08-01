@@ -17,12 +17,31 @@ extension DiskBrowserViewModel {
     }
 
     func saveSidebarWidth(_ width: CGFloat) {
-        let clamped = min(520, max(340, width))
+        guard !isSidebarWidthTrackingPaused else { return }
+
+        let clamped = min(480, max(280, width))
         guard abs(clamped - browserSidebarWidth) > 1 else { return }
+
         browserSidebarWidth = clamped
-        var prefs = AppPreferences.load()
-        prefs.browserSidebarWidth = Double(clamped)
-        prefs.save()
+
+        sidebarWidthSaveTask?.cancel()
+        sidebarWidthSaveTask = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            var prefs = AppPreferences.load()
+            prefs.browserSidebarWidth = Double(browserSidebarWidth)
+            prefs.save()
+        }
+    }
+
+    func pauseSidebarWidthTracking() {
+        isSidebarWidthTrackingPaused = true
+        sidebarWidthTrackingResumeTask?.cancel()
+        sidebarWidthTrackingResumeTask = Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            isSidebarWidthTrackingPaused = false
+        }
     }
 
     func setChartStyle(_ style: ChartStyle) {
