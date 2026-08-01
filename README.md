@@ -76,7 +76,7 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 ## Quick start
 
 ```bash
-git clone https://github.com/amirhossein/LazyDisk.git
+git clone https://github.com/DinonowDev/LazyDisk.git
 cd LazyDisk
 swift build && .build/debug/LazyDisk
 ```
@@ -107,7 +107,7 @@ CI runs `swift build`, `swift test`, and `Scripts/build-app.sh` on macOS via Git
 
 ## Download releases
 
-Pre-built `.app` bundles are available on **[GitHub Releases](https://github.com/amirhossein/LazyDisk/releases)**.
+Pre-built `.app` bundles are available on **[GitHub Releases](https://github.com/DinonowDev/LazyDisk/releases)**.
 
 1. Download the latest release artifact (`LazyDisk.app` or zip).
 2. Open `LazyDisk.app` (right-click → **Open** if Gatekeeper blocks unsigned builds).

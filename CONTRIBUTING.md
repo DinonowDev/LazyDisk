@@ -29,7 +29,7 @@ No third-party dependencies — the project uses only Apple frameworks and Swift
 ## Getting started
 
 ```bash
-git clone https://github.com/amirhossein/LazyDisk.git
+git clone https://github.com/DinonowDev/LazyDisk.git
 cd LazyDisk
 swift build
 .build/debug/LazyDisk
@@ -135,7 +135,7 @@ CODE_SIGN_IDENTITY="Developer ID Application: Your Name" \
 
 Pre-built `.app` bundles are published on GitHub Releases:
 
-1. Go to [github.com/amirhossein/LazyDisk/releases](https://github.com/amirhossein/LazyDisk/releases)
+1. Go to [github.com/DinonowDev/LazyDisk/releases](https://github.com/DinonowDev/LazyDisk/releases)
 2. Download the latest `LazyDisk.app` (or `.zip`) for your Mac
 3. If macOS blocks the app, right-click → **Open** the first time, or remove the quarantine attribute:
 
@@ -205,4 +205,4 @@ For feature requests, describe the problem you want solved and how LazyDisk coul
 
 ---
 
-Questions? Open a [GitHub Discussion](https://github.com/amirhossein/LazyDisk/discussions) or an issue on the repository.
+Questions? Open a [GitHub Discussion](https://github.com/DinonowDev/LazyDisk/discussions) or an issue on the repository.
