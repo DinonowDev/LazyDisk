@@ -44,7 +44,7 @@ extension DiskBrowserViewModel {
         chartChildRefreshTask?.cancel()
         let parents = chartItems.filter { $0.isDirectory && !$0.isVirtual }
 
-        chartChildRefreshTask = Task.detached(priority: .utility) { [weak self] in
+        chartChildRefreshTask = Task.detached(priority: .utility) { [weak viewModel = self] in
             try? await Task.sleep(nanoseconds: 50_000_000)
             guard !Task.isCancelled else { return }
 
@@ -84,7 +84,7 @@ extension DiskBrowserViewModel {
                 }
 
                 let children = await MainActor.run {
-                    self?.chartChildren(from: entries) ?? []
+                    viewModel?.chartChildren(from: entries) ?? []
                 }
                 if !children.isEmpty {
                     newMap[parentPath] = children
@@ -92,8 +92,9 @@ extension DiskBrowserViewModel {
             }
 
             guard !Task.isCancelled else { return }
+            let finalMap = newMap
             await MainActor.run {
-                self?.publishChartChildMap(newMap)
+                viewModel?.publishChartChildMap(finalMap)
             }
         }
     }

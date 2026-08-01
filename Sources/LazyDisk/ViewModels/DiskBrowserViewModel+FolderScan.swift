@@ -84,7 +84,7 @@ extension DiskBrowserViewModel {
         let directories = items.filter { $0.isDirectory && !$0.isVirtual }
         let parallelism = AppPreferences.load().scanParallelism
 
-        prefetchTask = Task.detached(priority: .utility) { [weak self] in
+        prefetchTask = Task.detached(priority: .utility) { [weak viewModel = self] in
             let total = directories.count
             for (index, item) in directories.enumerated() {
                 guard !Task.isCancelled else { return }
@@ -112,13 +112,15 @@ extension DiskBrowserViewModel {
 
                 await ScanCache.shared.set(folderURL, entries: sorted, isVolumeRoot: false)
 
+                let folderName = item.name
+                let prefetchIndex = index
                 await MainActor.run {
-                    guard let self, !Task.isCancelled else { return }
-                    if self.appPhase == .scanning {
-                        let fraction = 0.92 + (Double(index + 1) / Double(max(total, 1))) * 0.08
-                        self.scanProgressFraction = fraction
-                        self.scanCurrentFolder = item.name
-                        self.scanProgress = L10n.scanCachingFolders(index + 1, total)
+                    guard let viewModel, !Task.isCancelled else { return }
+                    if viewModel.appPhase == .scanning {
+                        let fraction = 0.92 + (Double(prefetchIndex + 1) / Double(max(total, 1))) * 0.08
+                        viewModel.scanProgressFraction = fraction
+                        viewModel.scanCurrentFolder = folderName
+                        viewModel.scanProgress = L10n.scanCachingFolders(prefetchIndex + 1, total)
                     }
                 }
             }

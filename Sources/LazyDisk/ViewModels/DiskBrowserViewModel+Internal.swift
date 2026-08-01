@@ -4,8 +4,10 @@ import Foundation
 import SwiftUI
 
 extension DiskBrowserViewModel {
-    func publishAfterCurrentUpdate(_ update: @escaping () -> Void) {
-        DispatchQueue.main.async(execute: update)
+    func publishAfterCurrentUpdate(_ update: @MainActor @escaping () -> Void) {
+        Task { @MainActor in
+            update()
+        }
     }
 
     func publishScanProgress(
