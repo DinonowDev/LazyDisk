@@ -26,9 +26,9 @@ struct PermissionsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { viewModel.refreshPermissions() }
+        .onAppear { viewModel.refreshPermissionsDeferred() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            viewModel.refreshPermissions()
+            viewModel.refreshPermissionsDeferred()
         }
     }
 

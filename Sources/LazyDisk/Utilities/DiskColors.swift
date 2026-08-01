@@ -19,14 +19,14 @@ enum DiskColors {
         palette[index % palette.count]
     }
 
-    static func gradient(for index: Int) -> LinearGradient {
+    static func gradient(for index: Int, depth: Int = 0) -> LinearGradient {
         let base = color(for: index)
+        let brighten = 1 + CGFloat(depth) * 0.08
+        let top = base.opacity(min(0.98, 0.88 + CGFloat(depth) * 0.04))
+        let mid = base.opacity(min(1, 0.95 * brighten))
+        let bottom = base.opacity(max(0.65, 0.78 - CGFloat(depth) * 0.06))
         return LinearGradient(
-            colors: [
-                base.opacity(0.92),
-                base,
-                base.opacity(0.78)
-            ],
+            colors: [top, mid, bottom],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

@@ -55,12 +55,12 @@ struct SunburstChartView: View {
                     let newID = hitTest(at: location, chartSize: chartSize, center: center)?.id
                     guard pointerHoveredID != newID else { return }
                     pointerHoveredID = newID
-                    onHover(newID)
+                    Task { @MainActor in onHover(newID) }
                 case .ended:
                     isPointerOverChart = false
                     guard pointerHoveredID != nil else { return }
                     pointerHoveredID = nil
-                    onHover(nil)
+                    Task { @MainActor in onHover(nil) }
                 }
             }
         }
@@ -94,7 +94,7 @@ struct SunburstChartView: View {
                     outerRadius: outerR,
                     cornerRadius: segment.depth == 0 ? 6 : 3
                 )
-                .fill(DiskColors.gradient(for: segment.colorIndex))
+                .fill(DiskColors.gradient(for: segment.colorIndex, depth: segment.depth))
                 .shadow(
                     color: DiskColors.color(for: segment.colorIndex).opacity(isHovered ? 0.35 : 0.12),
                     radius: isHovered ? 10 : 4,
@@ -131,45 +131,68 @@ struct SunburstChartView: View {
     }
 
     private func labelsLayer(chartSize: CGFloat, center: CGPoint) -> some View {
-        let outerR = chartSize * SunburstLayoutEngine.outerRadiusRatio(depth: 0, maxDepth: maxDepth)
         let depth0 = segments.filter { $0.depth == 0 }
+        let depth1 = segments.filter { $0.depth == 1 }
 
         return ZStack {
             ForEach(depth0) { segment in
-                if segment.spanAngle > 14 {
-                    let radius = outerR + 22
-                    let angle = (segment.midAngle - 90) * .pi / 180
-                    let x = center.x + radius * cos(angle)
-                    let y = center.y + radius * sin(angle)
-                    let isHovered = effectiveHoveredID == segment.item.id
-
-                    VStack(spacing: 2) {
-                        Text(segment.item.displayName)
-                            .font(.system(size: 10, weight: isHovered ? .bold : .semibold))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .minimumScaleFactor(0.75)
-                        Text(segment.item.formattedSize)
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .environment(\.layoutDirection, .leftToRight)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.92))
-                            .shadow(color: .black.opacity(0.06), radius: 4, y: 1)
-                    )
-                    .opacity(effectiveHoveredID == nil || isHovered ? 1 : 0.35)
-                    .position(x: x, y: y)
-                }
+                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: 10, minSpan: 14)
+            }
+            ForEach(depth1) { segment in
+                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: 9, minSpan: 10)
             }
         }
     }
 
+    @ViewBuilder
+    private func segmentLabel(
+        _ segment: SunburstSegment,
+        chartSize: CGFloat,
+        center: CGPoint,
+        fontSize: CGFloat,
+        minSpan: CGFloat
+    ) -> some View {
+        if segment.spanAngle > minSpan {
+            let outerR = chartSize * SunburstLayoutEngine.outerRadiusRatio(depth: segment.depth, maxDepth: maxDepth)
+            let innerR = chartSize * SunburstLayoutEngine.innerRadiusRatio(depth: segment.depth, maxDepth: maxDepth)
+            let radius = segment.depth == 0
+                ? outerR + 22
+                : (innerR + outerR) / 2
+            let angle = (segment.midAngle - 90) * .pi / 180
+            let x = center.x + radius * cos(angle)
+            let y = center.y + radius * sin(angle)
+            let isHovered = effectiveHoveredID == segment.item.id
+
+            VStack(spacing: 1) {
+                Text(segment.item.displayName)
+                    .font(.system(size: fontSize, weight: isHovered ? .bold : .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.7)
+                if segment.depth == 0 || segment.spanAngle > 16 {
+                    Text(segment.item.formattedSize)
+                        .font(.system(size: fontSize - 1, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .environment(\.layoutDirection, .leftToRight)
+                }
+            }
+            .padding(.horizontal, segment.depth == 0 ? 6 : 4)
+            .padding(.vertical, segment.depth == 0 ? 4 : 2)
+            .background {
+                if segment.depth == 0 {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.92))
+                        .shadow(color: .black.opacity(0.06), radius: 4, y: 1)
+                }
+            }
+            .foregroundStyle(segment.depth == 0 ? Color.primary : Color.primary.opacity(0.9))
+            .opacity(effectiveHoveredID == nil || isHovered ? 1 : 0.35)
+            .position(x: x, y: y)
+        }
+    }
+
     private func centerHub(chartSize: CGFloat, center: CGPoint) -> some View {
-        let hubSize = chartSize * 0.30
+        let hubSize = chartSize * ChartMetrics.hubRadiusRatio * 1.85
 
         return ZStack {
             Circle()
@@ -220,7 +243,7 @@ struct SunburstChartView: View {
         let dx = point.x - center.x
         let dy = point.y - center.y
         let distance = sqrt(dx * dx + dy * dy)
-        var angle = atan2(dy, dx) * 180 / .pi
+        let angle = atan2(dy, dx) * 180 / .pi
 
         for segment in segments.reversed() {
             let innerR = chartSize * SunburstLayoutEngine.innerRadiusRatio(depth: segment.depth, maxDepth: maxDepth)

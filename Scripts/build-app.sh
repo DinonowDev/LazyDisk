@@ -29,10 +29,10 @@ mkdir -p "$APP_DIR/Contents/Resources"
 
 cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
 
-if [[ -f "$ICON_ICNS" ]]; then
-  cp "$ICON_ICNS" "$APP_DIR/Contents/Resources/AppIcon.icns"
-fi
-
+INFO_TEMPLATE="$ROOT/Scripts/Info.plist.template"
+if [[ -f "$INFO_TEMPLATE" ]]; then
+  cp "$INFO_TEMPLATE" "$APP_DIR/Contents/Info.plist"
+else
 cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,6 +61,11 @@ cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
 </dict>
 </plist>
 PLIST
+fi
+
+if [[ -f "$ICON_ICNS" ]]; then
+  cp "$ICON_ICNS" "$APP_DIR/Contents/Resources/AppIcon.icns"
+fi
 
 if [[ -f "$ICON_ICNS" ]]; then
   /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP_DIR/Contents/Info.plist" 2>/dev/null \

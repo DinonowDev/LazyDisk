@@ -22,7 +22,7 @@ final class SunburstLayoutTests: XCTestCase {
         let segments = SunburstLayoutEngine.build(
             items: [users, apps],
             totalSize: 150,
-            childrenByParentID: [users.id: [child]]
+            childrenByParentPath: [PathUtils.resolved(users.url).path: [child]]
         )
 
         XCTAssertFalse(segments.isEmpty)
@@ -45,7 +45,7 @@ final class SunburstLayoutTests: XCTestCase {
         let segments = SunburstLayoutEngine.build(
             items: [parent],
             totalSize: 100,
-            childrenByParentID: [parent.id: [child]]
+            childrenByParentPath: [PathUtils.resolved(parent.url).path: [child]]
         )
         guard let parentSeg = segments.first(where: { $0.depth == 0 }),
               let childSeg = segments.first(where: { $0.depth == 1 }) else {

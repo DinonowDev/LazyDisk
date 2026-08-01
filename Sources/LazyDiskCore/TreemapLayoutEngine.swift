@@ -2,21 +2,41 @@ import Foundation
 import CoreGraphics
 
 public struct TreemapRect: Identifiable, Equatable {
-    public var id: UUID { item.id }
+    public var id: String { "\(item.id.uuidString)-\(depth)" }
     public let item: DiskItem
     public let rect: CGRect
     public let colorIndex: Int
+    public let depth: Int
 
-    public init(item: DiskItem, rect: CGRect, colorIndex: Int) {
+    public init(item: DiskItem, rect: CGRect, colorIndex: Int, depth: Int = 0) {
         self.item = item
         self.rect = rect
         self.colorIndex = colorIndex
+        self.depth = depth
     }
 }
 
 public enum TreemapLayoutEngine {
+    private static let maxChildrenPerNode = 8
+    private static let minChildRectSize: CGFloat = 28
+    private static let innerPadding: CGFloat = 5
+
     public static func layout(
         items: [DiskItem],
+        in bounds: CGRect,
+        padding: CGFloat = 2
+    ) -> [TreemapRect] {
+        layoutHierarchical(
+            items: items,
+            childrenByParentPath: [:],
+            in: bounds,
+            padding: padding
+        )
+    }
+
+    public static func layoutHierarchical(
+        items: [DiskItem],
+        childrenByParentPath: [String: [DiskItem]],
         in bounds: CGRect,
         padding: CGFloat = 2
     ) -> [TreemapRect] {
@@ -29,6 +49,8 @@ public enum TreemapLayoutEngine {
             items: Array(visible.enumerated()),
             rect: inset,
             horizontal: inset.width >= inset.height,
+            depth: 0,
+            childrenByParentPath: childrenByParentPath,
             output: &rects
         )
         return rects
@@ -38,12 +60,23 @@ public enum TreemapLayoutEngine {
         items: [(offset: Int, element: DiskItem)],
         rect: CGRect,
         horizontal: Bool,
+        depth: Int,
+        childrenByParentPath: [String: [DiskItem]],
         output: inout [TreemapRect]
     ) {
         guard !items.isEmpty, rect.width > 1, rect.height > 1 else { return }
 
         if items.count == 1 {
-            output.append(TreemapRect(item: items[0].element, rect: rect, colorIndex: items[0].offset))
+            let entry = items[0]
+            output.append(TreemapRect(item: entry.element, rect: rect, colorIndex: entry.offset, depth: depth))
+            layoutChildren(
+                of: entry.element,
+                in: rect,
+                colorIndex: entry.offset,
+                depth: depth,
+                childrenByParentPath: childrenByParentPath,
+                output: &output
+            )
             return
         }
 
@@ -65,7 +98,15 @@ public enum TreemapLayoutEngine {
                 for entry in slice {
                     let h = remaining.height * CGFloat(max(Double(entry.element.size), 1) / sliceTotal)
                     let tile = CGRect(x: cursor.x, y: y, width: max(sliceWidth, 1), height: max(h, 1))
-                    output.append(TreemapRect(item: entry.element, rect: tile, colorIndex: entry.offset))
+                    output.append(TreemapRect(item: entry.element, rect: tile, colorIndex: entry.offset, depth: depth))
+                    layoutChildren(
+                        of: entry.element,
+                        in: tile,
+                        colorIndex: entry.offset,
+                        depth: depth,
+                        childrenByParentPath: childrenByParentPath,
+                        output: &output
+                    )
                     y += h
                 }
                 cursor.x += sliceWidth
@@ -76,7 +117,15 @@ public enum TreemapLayoutEngine {
                 for entry in slice {
                     let w = remaining.width * CGFloat(max(Double(entry.element.size), 1) / sliceTotal)
                     let tile = CGRect(x: x, y: cursor.y, width: max(w, 1), height: max(sliceHeight, 1))
-                    output.append(TreemapRect(item: entry.element, rect: tile, colorIndex: entry.offset))
+                    output.append(TreemapRect(item: entry.element, rect: tile, colorIndex: entry.offset, depth: depth))
+                    layoutChildren(
+                        of: entry.element,
+                        in: tile,
+                        colorIndex: entry.offset,
+                        depth: depth,
+                        childrenByParentPath: childrenByParentPath,
+                        output: &output
+                    )
                     x += w
                 }
                 cursor.y += sliceHeight
@@ -85,5 +134,38 @@ public enum TreemapLayoutEngine {
 
             index += take
         }
+    }
+
+    private static func layoutChildren(
+        of parent: DiskItem,
+        in rect: CGRect,
+        colorIndex: Int,
+        depth: Int,
+        childrenByParentPath: [String: [DiskItem]],
+        output: inout [TreemapRect]
+    ) {
+        guard parent.isDirectory, !parent.isVirtual,
+              let children = childrenByParentPath[PathUtils.resolved(parent.url).path],
+              !children.isEmpty else { return }
+
+        let inset = rect.insetBy(dx: innerPadding, dy: innerPadding)
+        guard inset.width >= minChildRectSize * 2,
+              inset.height >= minChildRectSize * 2 else { return }
+
+        let visible = children
+            .filter { $0.size > 0 || $0.isScanning }
+            .sorted { $0.size > $1.size }
+            .prefix(maxChildrenPerNode)
+
+        guard !visible.isEmpty else { return }
+
+        layoutSlice(
+            items: Array(visible.enumerated()),
+            rect: inset,
+            horizontal: inset.width >= inset.height,
+            depth: depth + 1,
+            childrenByParentPath: childrenByParentPath,
+            output: &output
+        )
     }
 }

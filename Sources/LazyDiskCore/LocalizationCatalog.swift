@@ -17,7 +17,24 @@ public enum StringKey: String, CaseIterable {
     case cleanupTitle, cleanupEmpty, cleanupAddAll, cleanupScan
     case dupTitle, dupScan, dupEmpty, dupKeep, dupDelete
     case historyTitle, historyEmpty, historyDiff, historyGrowth, historySaved
-    case devTitle, devScan, devEmpty
+    case devTitle, devScan, devEmpty, devEmptyDesc, devReclaimable
+    case devItemsLabel, devProjectsLabel, devGlobalLabel, devSummarySubtitle
+    case devFilterAll, devGroupByProject, devGroupByType, devGlobalCaches, devGlobalCachesDesc, devItemsCount, devModifiedFmt
+    case devEcoJavaScript, devEcoTypeScript, devEcoPython, devEcoRust, devEcoGo, devEcoSwift
+    case devEcoJava, devEcoKotlin, devEcoRuby, devEcoPHP, devEcoDart, devEcoDocker, devEcoHomebrew
+    case devEcoIOS, devEcoAndroid, devEcoWeb, devEcoCSharp, devEcoGeneral
+    case devPurposeDependencies, devPurposeBuildOutput, devPurposeBuildCache, devPurposeDevServer
+    case devPurposeTestCache, devPurposeLangCache, devPurposePackageManager, devPurposeRuntime, devPurposeTooling
+    case devPurposeDescDependencies, devPurposeDescBuildOutput, devPurposeDescBuildCache, devPurposeDescDevServer
+    case devPurposeDescTestCache, devPurposeDescLangCache, devPurposeDescPackageManager, devPurposeDescRuntime, devPurposeDescTooling
+    case devSafetySafe, devSafetyRebuild, devSafetyCaution
+    case devDescNodeModules, devDescSwiftBuild, devDescPycache, devDescVenv, devDescNext, devDescTurbo
+    case devDescPods, devDescCarthage, devDescGradle, devDescRustTarget, devDescDist, devDescBuild
+    case devDescPytestCache, devDescMypyCache, devDescTox, devDescCargoRegistry, devDescVendor
+    case devDescBowerComponents, devDescParcelCache, devDescNuxt, devDescOutput, devDescCmakeDebug
+    case devDescCmakeRelease, devDescSwiftpm, devDescPackageResolved, devDescGoPkgMod, devDescHomebrewCache
+    case devDescDockerData, devDescGradleGlobal, devDescCargoDir, devDescGeneric
+    case devInCollector, devCollectorCount
     case goalTitle, goalTarget, goalSuggest, goalProgress
     case exportCSV, exportJSON, exportDone
     case recentFolders, bookmarks, addBookmark, removeBookmark
@@ -62,6 +79,8 @@ public enum StringKey: String, CaseIterable {
     case detailShowLargeFiles, detailShowDetails, chartHintSelect
     // Panel integration
     case cleanupCollectionsHint, devCollectionsHint
+    // Finder integration
+    case finderAnalyzeVolumeNotFound, finderAnalyzeHelp
     // About
     case menuAbout, aboutTagline, aboutVersion, aboutDeveloper, aboutCopyright, aboutLicense, aboutGitHub
 }
@@ -176,6 +195,91 @@ public struct LocalizationCatalog {
         .devTitle: ml(en: "Developer Junk", fa: "زباله توسعه", zh: "开发垃圾", fr: "Déchets dev", ar: "ملفات التطوير", tr: "Geliştirici çöpü"),
         .devScan: ml(en: "Scan dev folders", fa: "اسکن dev", zh: "扫描开发目录", fr: "Scanner dev", ar: "فحص dev", tr: "Dev tara"),
         .devEmpty: ml(en: "No dev junk found", fa: "چیزی نیست", zh: "未找到", fr: "Rien trouvé", ar: "لا شيء", tr: "Bulunamadı"),
+        .devEmptyDesc: ml(en: "Scans for node_modules, build caches, virtual environments, and package manager caches across your projects.", fa: "node_modules، کش build، محیط‌های مجازی و کش پکیج‌منیجر را در پروژه‌ها پیدا می‌کند.", zh: "扫描项目中的 node_modules、构建缓存、虚拟环境和包管理器缓存。", fr: "Recherche node_modules, caches de build, environnements virtuels et caches de gestionnaires de paquets.", ar: "يفحص node_modules وذاكرة البناء والبيئات الافتراضية وذاكرة مديري الحزم.", tr: "Projelerde node_modules, derleme önbellekleri, sanal ortamlar ve paket yöneticisi önbelleklerini tarar."),
+        .devReclaimable: ml(en: "Reclaimable", fa: "قابل آزادسازی", zh: "可释放", fr: "Récupérable", ar: "قابل الاسترداد", tr: "Geri kazanılabilir"),
+        .devItemsLabel: ml(en: "items", fa: "آیتم", zh: "项", fr: "éléments", ar: "عناصر", tr: "öğe"),
+        .devProjectsLabel: ml(en: "projects", fa: "پروژه", zh: "项目", fr: "projets", ar: "مشاريع", tr: "proje"),
+        .devGlobalLabel: ml(en: "global", fa: "سراسری", zh: "全局", fr: "global", ar: "عام", tr: "genel"),
+        .devSummarySubtitle: ml(en: "%d items · %d projects · %@ reclaimable", fa: "%d آیتم · %d پروژه · %@ قابل آزادسازی", zh: "%d 项 · %d 项目 · 可释放 %@", fr: "%d éléments · %d projets · %@ récupérables", ar: "%d عنصر · %d مشروع · %@ قابل الاسترداد", tr: "%d öğe · %d proje · %@ geri kazanılabilir"),
+        .devFilterAll: ml(en: "All", fa: "همه", zh: "全部", fr: "Tout", ar: "الكل", tr: "Tümü"),
+        .devGroupByProject: ml(en: "By Project", fa: "بر اساس پروژه", zh: "按项目", fr: "Par projet", ar: "حسب المشروع", tr: "Projeye göre"),
+        .devGroupByType: ml(en: "By Type", fa: "بر اساس نوع", zh: "按类型", fr: "Par type", ar: "حسب النوع", tr: "Türe göre"),
+        .devGlobalCaches: ml(en: "Global & System Caches", fa: "کش‌های سراسری و سیستمی", zh: "全局和系统缓存", fr: "Caches globaux et système", ar: "ذاكرة عامة ونظام", tr: "Genel ve sistem önbellekleri"),
+        .devGlobalCachesDesc: ml(en: "Shared across all projects — package registries, tool caches", fa: "مشترک بین همه پروژه‌ها — رجیستری پکیج‌ها و کش ابزارها", zh: "所有项目共享 — 包注册表、工具缓存", fr: "Partagé entre tous les projets — registres de paquets, caches d'outils", ar: "مشترك بين جميع المشاريع — سجلات الحزم وذاكرة الأدوات", tr: "Tüm projelerde paylaşılan — paket kayıtları, araç önbellekleri"),
+        .devItemsCount: ml(en: "%d items", fa: "%d آیتم", zh: "%d 项", fr: "%d éléments", ar: "%d عنصر", tr: "%d öğe"),
+        .devModifiedFmt: ml(en: "Modified %@", fa: "تغییر %@", zh: "修改于 %@", fr: "Modifié %@", ar: "تعديل %@", tr: "Değiştirildi %@"),
+        .devEcoJavaScript: ml(en: "JavaScript", fa: "جاوااسکریپت", zh: "JavaScript", fr: "JavaScript", ar: "JavaScript", tr: "JavaScript"),
+        .devEcoTypeScript: ml(en: "TypeScript", fa: "تایپ‌اسکریپت", zh: "TypeScript", fr: "TypeScript", ar: "TypeScript", tr: "TypeScript"),
+        .devEcoPython: ml(en: "Python", fa: "پایتون", zh: "Python", fr: "Python", ar: "Python", tr: "Python"),
+        .devEcoRust: ml(en: "Rust", fa: "راست", zh: "Rust", fr: "Rust", ar: "Rust", tr: "Rust"),
+        .devEcoGo: ml(en: "Go", fa: "گو", zh: "Go", fr: "Go", ar: "Go", tr: "Go"),
+        .devEcoSwift: ml(en: "Swift", fa: "سوئیفت", zh: "Swift", fr: "Swift", ar: "Swift", tr: "Swift"),
+        .devEcoJava: ml(en: "Java", fa: "جاوا", zh: "Java", fr: "Java", ar: "Java", tr: "Java"),
+        .devEcoKotlin: ml(en: "Kotlin", fa: "کاتلین", zh: "Kotlin", fr: "Kotlin", ar: "Kotlin", tr: "Kotlin"),
+        .devEcoRuby: ml(en: "Ruby", fa: "روبی", zh: "Ruby", fr: "Ruby", ar: "Ruby", tr: "Ruby"),
+        .devEcoPHP: ml(en: "PHP", fa: "PHP", zh: "PHP", fr: "PHP", ar: "PHP", tr: "PHP"),
+        .devEcoDart: ml(en: "Dart", fa: "دارت", zh: "Dart", fr: "Dart", ar: "Dart", tr: "Dart"),
+        .devEcoDocker: ml(en: "Docker", fa: "داکر", zh: "Docker", fr: "Docker", ar: "Docker", tr: "Docker"),
+        .devEcoHomebrew: ml(en: "Homebrew", fa: "هوم‌برو", zh: "Homebrew", fr: "Homebrew", ar: "Homebrew", tr: "Homebrew"),
+        .devEcoIOS: ml(en: "iOS / Apple", fa: "iOS / اپل", zh: "iOS / Apple", fr: "iOS / Apple", ar: "iOS / Apple", tr: "iOS / Apple"),
+        .devEcoAndroid: ml(en: "Android", fa: "اندروید", zh: "Android", fr: "Android", ar: "Android", tr: "Android"),
+        .devEcoWeb: ml(en: "Web / Frontend", fa: "وب / فرانت‌اند", zh: "Web / 前端", fr: "Web / Frontend", ar: "ويب / واجهة", tr: "Web / Frontend"),
+        .devEcoCSharp: ml(en: "C# / .NET", fa: "C# / .NET", zh: "C# / .NET", fr: "C# / .NET", ar: "C# / .NET", tr: "C# / .NET"),
+        .devEcoGeneral: ml(en: "General", fa: "عمومی", zh: "通用", fr: "Général", ar: "عام", tr: "Genel"),
+        .devPurposeDependencies: ml(en: "Dependencies", fa: "وابستگی‌ها", zh: "依赖", fr: "Dépendances", ar: "تبعيات", tr: "Bağımlılıklar"),
+        .devPurposeBuildOutput: ml(en: "Build Output", fa: "خروجی build", zh: "构建输出", fr: "Sortie de build", ar: "مخرجات البناء", tr: "Derleme çıktısı"),
+        .devPurposeBuildCache: ml(en: "Build Cache", fa: "کش build", zh: "构建缓存", fr: "Cache de build", ar: "ذاكرة البناء", tr: "Derleme önbelleği"),
+        .devPurposeDevServer: ml(en: "Dev Server Cache", fa: "کش dev server", zh: "开发服务器缓存", fr: "Cache serveur dev", ar: "ذاكرة خادم التطوير", tr: "Dev sunucu önbelleği"),
+        .devPurposeTestCache: ml(en: "Test Cache", fa: "کش تست", zh: "测试缓存", fr: "Cache de tests", ar: "ذاكرة الاختبار", tr: "Test önbelleği"),
+        .devPurposeLangCache: ml(en: "Language Cache", fa: "کش زبان", zh: "语言缓存", fr: "Cache langage", ar: "ذاكرة اللغة", tr: "Dil önbelleği"),
+        .devPurposePackageManager: ml(en: "Package Manager", fa: "مدیر پکیج", zh: "包管理器", fr: "Gestionnaire de paquets", ar: "مدير الحزم", tr: "Paket yöneticisi"),
+        .devPurposeRuntime: ml(en: "Runtime Data", fa: "داده runtime", zh: "运行时数据", fr: "Données runtime", ar: "بيانات التشغيل", tr: "Çalışma zamanı verisi"),
+        .devPurposeTooling: ml(en: "Tooling", fa: "ابزارها", zh: "工具", fr: "Outils", ar: "أدوات", tr: "Araçlar"),
+        .devPurposeDescDependencies: ml(en: "Installed packages — re-download with npm/yarn/pip/cargo", fa: "پکیج‌های نصب‌شده — با npm/yarn/pip/cargo دوباره دانلود می‌شوند", zh: "已安装的包 — 可通过 npm/yarn/pip/cargo 重新下载", fr: "Paquets installés — re-téléchargeables via npm/yarn/pip/cargo", ar: "حزم مثبتة — تُعاد تنزيلها عبر npm/yarn/pip/cargo", tr: "Yüklü paketler — npm/yarn/pip/cargo ile yeniden indirilebilir"),
+        .devPurposeDescBuildOutput: ml(en: "Compiled binaries and production builds", fa: "باینری‌های کامپایل‌شده و build تولیدی", zh: "编译的二进制文件和生产构建", fr: "Binaires compilés et builds de production", ar: "ملفات ثنائية مُجمَّعة وبناءات الإنتاج", tr: "Derlenmiş ikili dosyalar ve üretim derlemeleri"),
+        .devPurposeDescBuildCache: ml(en: "Intermediate build artifacts — speeds up next compile", fa: "آرتیفکت‌های میانی build — کامپایل بعدی را سریع‌تر می‌کند", zh: "中间构建产物 — 加速下次编译", fr: "Artefacts intermédiaires — accélère la prochaine compilation", ar: "مخرجات بناء وسيطة — تُسرِّع التجميع التالي", tr: "Ara derleme çıktıları — sonraki derlemeyi hızlandırır"),
+        .devPurposeDescDevServer: ml(en: "Hot-reload and dev server caches — rebuild on next run", fa: "کش hot-reload و dev server — در اجرای بعدی rebuild می‌شود", zh: "热重载和开发服务器缓存 — 下次运行时重建", fr: "Caches hot-reload et serveur dev — reconstruit au prochain lancement", ar: "ذاكرة إعادة التحميل وخادم التطوير — يُعاد البناء عند التشغيل التالي", tr: "Hot-reload ve dev sunucu önbellekleri — sonraki çalıştırmada yeniden oluşturulur"),
+        .devPurposeDescTestCache: ml(en: "Test runner caches — regenerated on next test run", fa: "کش test runner — در اجرای بعدی تست دوباره ساخته می‌شود", zh: "测试运行器缓存 — 下次测试时重新生成", fr: "Caches de tests — régénérés au prochain lancement", ar: "ذاكرة مشغل الاختبار — تُعاد عند التشغيل التالي", tr: "Test çalıştırıcı önbellekleri — sonraki testte yeniden oluşturulur"),
+        .devPurposeDescLangCache: ml(en: "Bytecode and type-check caches", fa: "کش bytecode و type-check", zh: "字节码和类型检查缓存", fr: "Caches bytecode et vérification de types", ar: "ذاكرة bytecode وفحص الأنواع", tr: "Bytecode ve tip kontrol önbellekleri"),
+        .devPurposeDescPackageManager: ml(en: "Global package registry and download caches", fa: "رجیستری و کش دانلود پکیج‌های سراسری", zh: "全局包注册表和下载缓存", fr: "Registre global et caches de téléchargement", ar: "سجل الحزم العام وذاكرة التنزيل", tr: "Genel paket kaydı ve indirme önbellekleri"),
+        .devPurposeDescRuntime: ml(en: "Container images and runtime state", fa: "ایمیج کانتینر و وضعیت runtime", zh: "容器镜像和运行时状态", fr: "Images de conteneurs et état runtime", ar: "صور الحاويات وحالة التشغيل", tr: "Konteyner imajları ve çalışma zamanı durumu"),
+        .devPurposeDescTooling: ml(en: "Third-party build tools and lock files", fa: "ابزارهای build شخص ثالث و فایل‌های lock", zh: "第三方构建工具和锁文件", fr: "Outils de build tiers et fichiers de verrouillage", ar: "أدوات بناء طرف ثالث وملفات القفل", tr: "Üçüncü taraf derleme araçları ve kilit dosyaları"),
+        .devSafetySafe: ml(en: "Safe", fa: "ایمن", zh: "安全", fr: "Sûr", ar: "آمن", tr: "Güvenli"),
+        .devSafetyRebuild: ml(en: "Rebuild", fa: "نیاز به rebuild", zh: "需重建", fr: "Reconstruire", ar: "إعادة بناء", tr: "Yeniden derle"),
+        .devSafetyCaution: ml(en: "Caution", fa: "احتیاط", zh: "谨慎", fr: "Attention", ar: "حذر", tr: "Dikkat"),
+        .devDescNodeModules: ml(en: "npm/yarn/pnpm installed packages for this project", fa: "پکیج‌های نصب‌شده npm/yarn/pnpm این پروژه", zh: "此项目的 npm/yarn/pnpm 已安装包", fr: "Paquets npm/yarn/pnpm installés pour ce projet", ar: "حزم npm/yarn/pnpm المثبتة لهذا المشروع", tr: "Bu proje için yüklü npm/yarn/pnpm paketleri"),
+        .devDescSwiftBuild: ml(en: "Swift Package Manager build output (.build)", fa: "خروجی build Swift Package Manager", zh: "Swift Package Manager 构建输出", fr: "Sortie de build Swift Package Manager", ar: "مخرجات بناء Swift Package Manager", tr: "Swift Package Manager derleme çıktısı"),
+        .devDescPycache: ml(en: "Python bytecode cache — auto-regenerated on import", fa: "کش bytecode پایتون — هنگام import خودکار ساخته می‌شود", zh: "Python 字节码缓存 — 导入时自动重新生成", fr: "Cache bytecode Python — régénéré à l'import", ar: "ذاكرة bytecode بايثون — تُعاد عند الاستيراد", tr: "Python bytecode önbelleği — import sırasında yeniden oluşturulur"),
+        .devDescVenv: ml(en: "Python virtual environment with isolated packages", fa: "محیط مجازی پایتون با پکیج‌های ایزوله", zh: "Python 虚拟环境及隔离包", fr: "Environnement virtuel Python avec paquets isolés", ar: "بيئة Python الافتراضية مع حزم معزولة", tr: "İzole paketlerle Python sanal ortamı"),
+        .devDescNext: ml(en: "Next.js build output and dev server cache (.next)", fa: "خروجی build و کش dev server نکست‌جی‌اس", zh: "Next.js 构建输出和开发服务器缓存", fr: "Sortie de build et cache serveur dev Next.js", ar: "مخرجات بناء Next.js وذاكرة خادم التطوير", tr: "Next.js derleme çıktısı ve dev sunucu önbelleği"),
+        .devDescTurbo: ml(en: "Turborepo remote and local build cache", fa: "کش build محلی و remote توربورپو", zh: "Turborepo 远程和本地构建缓存", fr: "Cache de build local et distant Turborepo", ar: "ذاكرة بناء Turborepo المحلية والبعيدة", tr: "Turborepo yerel ve uzak derleme önbelleği"),
+        .devDescPods: ml(en: "CocoaPods iOS/macOS dependencies", fa: "وابستگی‌های CocoaPods برای iOS/macOS", zh: "CocoaPods iOS/macOS 依赖", fr: "Dépendances CocoaPods iOS/macOS", ar: "تبعيات CocoaPods لـ iOS/macOS", tr: "CocoaPods iOS/macOS bağımlılıkları"),
+        .devDescCarthage: ml(en: "Carthage pre-built iOS frameworks", fa: "فریم‌ورک‌های ازپیش‌ساخته Carthage", zh: "Carthage 预构建 iOS 框架", fr: "Frameworks iOS pré-construits Carthage", ar: "أطر iOS مُجمَّعة مسبقًا من Carthage", tr: "Carthage önceden derlenmiş iOS framework'leri"),
+        .devDescGradle: ml(en: "Gradle build cache for Android/Java/Kotlin", fa: "کش build گرادل برای اندروید/جاوا/کاتلین", zh: "Android/Java/Kotlin 的 Gradle 构建缓存", fr: "Cache de build Gradle pour Android/Java/Kotlin", ar: "ذاكرة بناء Gradle لـ Android/Java/Kotlin", tr: "Android/Java/Kotlin için Gradle derleme önbelleği"),
+        .devDescRustTarget: ml(en: "Rust compiled artifacts (target/)", fa: "آرتیفکت‌های کامپایل‌شده راست (target/)", zh: "Rust 编译产物 (target/)", fr: "Artefacts compilés Rust (target/)", ar: "مخرجات Rust المُجمَّعة (target/)", tr: "Rust derlenmiş çıktıları (target/)"),
+        .devDescDist: ml(en: "Production build output (dist/)", fa: "خروجی build تولیدی (dist/)", zh: "生产构建输出 (dist/)", fr: "Sortie de build de production (dist/)", ar: "مخرجات بناء الإنتاج (dist/)", tr: "Üretim derleme çıktısı (dist/)"),
+        .devDescBuild: ml(en: "Generic build output directory", fa: "فولدر خروجی build عمومی", zh: "通用构建输出目录", fr: "Répertoire de sortie de build générique", ar: "مجلد مخرجات بناء عام", tr: "Genel derleme çıktısı dizini"),
+        .devDescPytestCache: ml(en: "pytest test discovery and run cache", fa: "کش discovery و اجرای pytest", zh: "pytest 测试发现和运行缓存", fr: "Cache de découverte et exécution pytest", ar: "ذاكرة اكتشاف وتشغيل pytest", tr: "pytest test keşif ve çalıştırma önbelleği"),
+        .devDescMypyCache: ml(en: "mypy static type checker cache", fa: "کش type checker استاتیک mypy", zh: "mypy 静态类型检查器缓存", fr: "Cache du vérificateur de types statique mypy", ar: "ذاكرة فاحص الأنواع الثابت mypy", tr: "mypy statik tip denetleyici önbelleği"),
+        .devDescTox: ml(en: "tox multi-environment test cache", fa: "کش تست چندمحیطی tox", zh: "tox 多环境测试缓存", fr: "Cache de tests multi-environnements tox", ar: "ذاكرة اختبار tox متعدد البيئات", tr: "tox çoklu ortam test önbelleği"),
+        .devDescCargoRegistry: ml(en: "Global Rust crate registry cache (~/.cargo/registry)", fa: "کش رجیستری crate راست سراسری", zh: "全局 Rust crate 注册表缓存", fr: "Cache du registre global de crates Rust", ar: "ذاكرة سجل crate Rust العام", tr: "Genel Rust crate kayıt önbelleği"),
+        .devDescVendor: ml(en: "Composer/Go vendored dependencies", fa: "وابستگی‌های vendor شده Composer/Go", zh: "Composer/Go 供应商依赖", fr: "Dépendances vendored Composer/Go", ar: "تبعيات Composer/Go الموردة", tr: "Composer/Go vendor bağımlılıkları"),
+        .devDescBowerComponents: ml(en: "Legacy Bower frontend packages", fa: "پکیج‌های فرانت‌اند Bower قدیمی", zh: "旧版 Bower 前端包", fr: "Anciens paquets frontend Bower", ar: "حزم Bower الأمامية القديمة", tr: "Eski Bower frontend paketleri"),
+        .devDescParcelCache: ml(en: "Parcel bundler transform cache", fa: "کش transform باندلر Parcel", zh: "Parcel 打包器转换缓存", fr: "Cache de transformation du bundler Parcel", ar: "ذاكرة تحويل مجمّع Parcel", tr: "Parcel bundler dönüşüm önbelleği"),
+        .devDescNuxt: ml(en: "Nuxt.js build and dev server cache", fa: "کش build و dev server ناکست", zh: "Nuxt.js 构建和开发服务器缓存", fr: "Cache de build et serveur dev Nuxt.js", ar: "ذاكرة بناء وخادم تطوير Nuxt.js", tr: "Nuxt.js derleme ve dev sunucu önbelleği"),
+        .devDescOutput: ml(en: "Nuxt/SvelteKit production output", fa: "خروجی تولیدی Nuxt/SvelteKit", zh: "Nuxt/SvelteKit 生产输出", fr: "Sortie de production Nuxt/SvelteKit", ar: "مخرجات إنتاج Nuxt/SvelteKit", tr: "Nuxt/SvelteKit üretim çıktısı"),
+        .devDescCmakeDebug: ml(en: "CMake debug build directory", fa: "فولدر build دیباگ CMake", zh: "CMake 调试构建目录", fr: "Répertoire de build debug CMake", ar: "مجلد بناء تصحيح CMake", tr: "CMake debug derleme dizini"),
+        .devDescCmakeRelease: ml(en: "CMake release build directory", fa: "فولدر build رلیز CMake", zh: "CMake 发布构建目录", fr: "Répertoire de build release CMake", ar: "مجلد بناء إصدار CMake", tr: "CMake release derleme dizini"),
+        .devDescSwiftpm: ml(en: "SwiftPM configuration and build state", fa: "پیکربندی و وضعیت build SwiftPM", zh: "SwiftPM 配置和构建状态", fr: "Configuration et état de build SwiftPM", ar: "تكوين وحالة بناء SwiftPM", tr: "SwiftPM yapılandırma ve derleme durumu"),
+        .devDescPackageResolved: ml(en: "SwiftPM resolved dependency lock file", fa: "فایل lock وابستگی‌های حل‌شده SwiftPM", zh: "SwiftPM 已解析依赖锁文件", fr: "Fichier de verrouillage des dépendances SwiftPM", ar: "ملف قفل تبعيات SwiftPM المحلولة", tr: "SwiftPM çözümlenmiş bağımlılık kilit dosyası"),
+        .devDescGoPkgMod: ml(en: "Global Go module download cache (~/go/pkg/mod)", fa: "کش دانلود ماژول گو سراسری", zh: "全局 Go 模块下载缓存", fr: "Cache global de téléchargement de modules Go", ar: "ذاكرة تنزيل وحدة Go العامة", tr: "Genel Go modül indirme önbelleği"),
+        .devDescHomebrewCache: ml(en: "Homebrew formula download cache", fa: "کش دانلود فرمول‌های Homebrew", zh: "Homebrew 公式下载缓存", fr: "Cache de téléchargement des formules Homebrew", ar: "ذاكرة تنزيل صيغ Homebrew", tr: "Homebrew formül indirme önbelleği"),
+        .devDescDockerData: ml(en: "Docker Desktop VM and container data", fa: "داده VM و کانتینر Docker Desktop", zh: "Docker Desktop 虚拟机和容器数据", fr: "Données VM et conteneurs Docker Desktop", ar: "بيانات VM وحاويات Docker Desktop", tr: "Docker Desktop VM ve konteyner verisi"),
+        .devDescGradleGlobal: ml(en: "Global Gradle daemon and dependency cache", fa: "کش daemon و وابستگی گرادل سراسری", zh: "全局 Gradle 守护进程和依赖缓存", fr: "Cache global du daemon et des dépendances Gradle", ar: "ذاكرة daemon Gradle والتبعيات العامة", tr: "Genel Gradle daemon ve bağımlılık önbelleği"),
+        .devDescCargoDir: ml(en: "Rust cargo home — registry, git checkouts, build cache", fa: "خانه cargo راست — رجیستری، git checkout، کش build", zh: "Rust cargo 主目录 — 注册表、git 检出、构建缓存", fr: "Répertoire cargo Rust — registre, checkouts git, cache de build", ar: "مجلد cargo Rust — السجل، git checkout، ذاكرة البناء", tr: "Rust cargo ana dizini — kayıt, git checkout, derleme önbelleği"),
+        .devDescGeneric: ml(en: "Development artifact folder", fa: "فولدر آرتیفکت توسعه", zh: "开发产物文件夹", fr: "Dossier d'artefacts de développement", ar: "مجلد مخرجات التطوير", tr: "Geliştirme çıktısı klasörü"),
+        .devInCollector: ml(en: "In Collector", fa: "در سطل", zh: "已加入收集器", fr: "Dans le collecteur", ar: "في المجمع", tr: "Toplayıcıda"),
+        .devCollectorCount: ml(en: "%d in Collector", fa: "%d در سطل", zh: "%d 项在收集器", fr: "%d dans le collecteur", ar: "%d في المجمع", tr: "%d toplayıcıda"),
         .goalTitle: ml(en: "Free Space Goal", fa: "هدف آزادسازی", zh: "释放目标", fr: "Objectif d'espace", ar: "هدف المساحة", tr: "Boş alan hedefi"),
         .goalTarget: ml(en: "Target to free", fa: "هدف آزادسازی", zh: "目标释放", fr: "Objectif", ar: "الهدف", tr: "Hedef"),
         .goalSuggest: ml(en: "Suggest items", fa: "پیشنهاد آیتم", zh: "推荐项目", fr: "Suggérer", ar: "اقتراح", tr: "Öner"),
@@ -344,6 +448,8 @@ public struct LocalizationCatalog {
         .detailShowDetails: ml(en: "Show Details", fa: "نمایش جزئیات", zh: "显示详情", fr: "Afficher les détails", ar: "عرض التفاصيل", tr: "Detayları göster"),
         .cleanupCollectionsHint: ml(en: "Old downloads are listed in Browse → Smart Collections:", fa: "دانلودهای قدیمی در مرورگر → مجموعه‌های هوشمند:", zh: "旧下载见浏览 → 智能集合：", fr: "Anciens téléchargements dans Parcourir → Collections :", ar: "التنزيلات القديمة في التصفح → المجموعات:", tr: "Eski indirmeler Gözat → Akıllı koleksiyonlar:"),
         .devCollectionsHint: ml(en: "Xcode junk and volume-wide node_modules → Browse → Smart Collections:", fa: "زباله Xcode و node_modules سراسری → مرورگر → مجموعه‌های هوشمند:", zh: "Xcode 垃圾和全盘 node_modules → 浏览 → 智能集合：", fr: "Déchets Xcode et node_modules → Parcourir → Collections :", ar: "مخلفات Xcode و node_modules → التصفح → المجموعات:", tr: "Xcode çöpü ve node_modules → Gözat → Akıllı koleksiyonlar:"),
+        .finderAnalyzeVolumeNotFound: ml(en: "That folder is not on a disk LazyDisk can scan.", fa: "این فولدر روی دیسکی نیست که LazyDisk بتواند اسکن کند.", zh: "该文件夹不在 LazyDisk 可扫描的磁盘上。", fr: "Ce dossier n'est pas sur un volume analysable par LazyDisk.", ar: "هذا المجلد ليس على قرص يمكن لـ LazyDisk فحصه.", tr: "Bu klasör LazyDisk'in tarayabileceği bir diskte değil."),
+        .finderAnalyzeHelp: ml(en: "Finder → right-click → Quick Actions → Analyze with LazyDisk (enable under System Settings → Privacy → Extensions → Finder).", fa: "Finder → کلیک راست → Quick Actions → Analyze with LazyDisk (از System Settings → Privacy → Extensions → Finder فعال کنید).", zh: "Finder → 右键 → 快速操作 → Analyze with LazyDisk（在系统设置 → 隐私 → 扩展 → Finder 中启用）。", fr: "Finder → clic droit → Actions rapides → Analyze with LazyDisk.", ar: "Finder → نقرة يمين → إجراءات سريعة → Analyze with LazyDisk.", tr: "Finder → sağ tık → Hızlı Eylemler → Analyze with LazyDisk."),
         .menuAbout: ml(en: "About LazyDisk", fa: "درباره LazyDisk", zh: "关于 LazyDisk", fr: "À propos de LazyDisk", ar: "حول LazyDisk", tr: "LazyDisk Hakkında"),
         .aboutTagline: ml(en: "A native macOS disk space analyzer", fa: "تحلیل‌گر فضای دیسک بومی macOS", zh: "原生 macOS 磁盘空间分析器", fr: "Analyseur d'espace disque macOS natif", ar: "محلل مساحة القرص الأصلي لـ macOS", tr: "Yerel macOS disk alanı analizörü"),
         .aboutVersion: ml(en: "Version", fa: "نسخه", zh: "版本", fr: "Version", ar: "الإصدار", tr: "Sürüm"),

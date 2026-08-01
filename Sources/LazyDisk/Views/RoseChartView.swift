@@ -82,12 +82,12 @@ struct RoseChartView: View {
                     )?.id
                     guard pointerHoveredID != newID else { return }
                     pointerHoveredID = newID
-                    onHover(newID)
+                    Task { @MainActor in onHover(newID) }
                 case .ended:
                     isPointerOverChart = false
                     guard pointerHoveredID != nil else { return }
                     pointerHoveredID = nil
-                    onHover(nil)
+                    Task { @MainActor in onHover(nil) }
                 }
             }
         }

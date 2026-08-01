@@ -50,7 +50,7 @@ struct ScanProgressPanelView: View {
 
             if let detail, !detail.isEmpty {
                 HStack(spacing: 6) {
-                    ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
+                    CompactProgressView(size: 12)
                     Text(detail)
                         .font(.system(size: 10))
                         .foregroundStyle(.quaternary)

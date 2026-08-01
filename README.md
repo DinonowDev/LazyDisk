@@ -193,6 +193,18 @@ For complete scanning of system folders:
 2. Add `LazyDisk.app` (or Terminal if running via `swift run`)
 3. Restart the app
 
+## Finder Quick Action
+
+After building the `.app` bundle (`./Scripts/build-app.sh`), you can analyze any folder from Finder:
+
+1. **Right-click** a folder or file → **Quick Actions** → **Analyze with LazyDisk**  
+   (If missing: **System Settings → Privacy & Security → Extensions → Finder** → enable LazyDisk.)
+2. Or use **Finder → Services** → **Analyze with LazyDisk**
+3. Or from Terminal: `open -a LazyDisk ~/Downloads`
+4. Or custom URL: `open lazydisk://open?path=/Users/you/Projects`
+
+LazyDisk opens the Browse panel and navigates to that folder (starting a volume scan first if needed).
+
 ## Usage
 
 | Action | How |

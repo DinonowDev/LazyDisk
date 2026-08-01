@@ -10,6 +10,9 @@ final class LocalizationCompletenessTests: XCTestCase {
             .chartStyleTreemap, .collectionTitle, .collectionLargeFiles, .detailTitle, .detailPath,
             .detailCreated, .detailShowDetails, .chartHintSelect,
             .cleanupCollectionsHint, .devCollectionsHint,
+            .devEmptyDesc, .devReclaimable, .devSummarySubtitle, .devGroupByProject,
+            .devPurposeDependencies, .devSafetySafe, .devDescNodeModules,
+            .finderAnalyzeVolumeNotFound, .finderAnalyzeHelp,
         ]
         let languages: [AppLanguage] = [.english, .persian, .chinese, .french, .arabic, .turkish]
 

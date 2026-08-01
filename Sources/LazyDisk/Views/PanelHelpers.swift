@@ -1,5 +1,15 @@
 import SwiftUI
 
+struct CompactProgressView: View {
+    var size: CGFloat = 12
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.mini)
+            .frame(width: size, height: size)
+    }
+}
+
 @ViewBuilder
 func panelHeader(title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -55,5 +65,32 @@ struct SmartCollectionLinkBanner: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.06)))
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Collector toggle
+
+struct CollectorToggleButton: View {
+    @EnvironmentObject var viewModel: DiskBrowserViewModel
+    let url: URL
+    var size: CGFloat = 22
+
+    private var isAdded: Bool { viewModel.isInCollector(url: url) }
+
+    var body: some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.toggleCollector(url: url)
+            }
+        } label: {
+            Image(systemName: isAdded ? "checkmark.circle.fill" : "plus.circle")
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(isAdded ? Color.green : Color.accentColor)
+                .frame(width: size + 4, height: size + 4)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isAdded)
+        }
+        .buttonStyle(.plain)
+        .help(isAdded ? L10n.removeFromCollector : L10n.addToCollector)
+        .accessibilityLabel(isAdded ? L10n.removeFromCollector : L10n.addToCollector)
     }
 }

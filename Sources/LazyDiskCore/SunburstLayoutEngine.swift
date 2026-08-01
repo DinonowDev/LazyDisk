@@ -36,7 +36,7 @@ public enum SunburstLayoutEngine {
     public static func build(
         items: [DiskItem],
         totalSize: Int64,
-        childrenByParentID: [UUID: [DiskItem]]
+        childrenByParentPath: [String: [DiskItem]]
     ) -> [SunburstSegment] {
         guard !items.isEmpty else { return [] }
 
@@ -64,8 +64,13 @@ public enum SunburstLayoutEngine {
                 var span = fraction * usable
                 if item.size > 0 { span = max(span, minSliceDegrees) }
 
-                let colorIndex = inheritedColor ?? colorCursor
-                if inheritedColor == nil { colorCursor += 1 }
+                let colorIndex: Int
+                if let inheritedColor {
+                    colorIndex = inheritedColor + index
+                } else {
+                    colorIndex = colorCursor
+                    colorCursor += 1
+                }
 
                 segments.append(SunburstSegment(
                     item: item,
@@ -77,7 +82,7 @@ public enum SunburstLayoutEngine {
                 ))
 
                 if item.isDirectory, !item.isVirtual,
-                   let children = childrenByParentID[item.id],
+                   let children = childrenByParentPath[PathUtils.resolved(item.url).path],
                    !children.isEmpty, span > 2 {
                     let sorted = children
                         .filter { $0.size > 0 }
@@ -106,17 +111,17 @@ public enum SunburstLayoutEngine {
     }
 
     public static func innerRadiusRatio(depth: Int, maxDepth: Int) -> CGFloat {
-        let hub: CGFloat = 0.16
-        let usable: CGFloat = 0.36
+        let hub: CGFloat = 0.24
+        let maxOuter: CGFloat = 0.38
         let ringCount = CGFloat(max(maxDepth, 0) + 1)
-        let ringWidth = usable / ringCount
+        let ringWidth = (maxOuter - hub) / ringCount
         return hub + CGFloat(depth) * ringWidth
     }
 
     public static func outerRadiusRatio(depth: Int, maxDepth: Int) -> CGFloat {
         let inner = innerRadiusRatio(depth: depth, maxDepth: maxDepth)
         let ringCount = CGFloat(max(maxDepth, 0) + 1)
-        let ringWidth = 0.36 / ringCount
-        return inner + ringWidth - 0.004
+        let ringWidth = (0.38 - 0.24) / ringCount
+        return inner + ringWidth
     }
 }

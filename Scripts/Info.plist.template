@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>LazyDisk</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.lazydisk.app</string>
+    <key>CFBundleName</key>
+    <string>LazyDisk</string>
+    <key>CFBundleDisplayName</key>
+    <string>LazyDisk</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.lazydisk.analyze</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>lazydisk</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>Analyze with LazyDisk</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>analyzeWithLazyDisk</string>
+            <key>NSPortName</key>
+            <string>LazyDisk</string>
+            <key>NSSendFileTypes</key>
+            <array>
+                <string>public.folder</string>
+                <string>public.item</string>
+            </array>
+            <key>NSUserData</key>
+            <string>analyze</string>
+            <key>NSRequiredContext</key>
+            <dict>
+                <key>NSTextContent</key>
+                <string>FILEPATH</string>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>

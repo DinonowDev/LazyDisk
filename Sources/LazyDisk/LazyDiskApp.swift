@@ -15,6 +15,14 @@ struct LazyDiskApp: App {
             RootView()
                 .environmentObject(viewModel)
                 .frame(minWidth: 1100, minHeight: 750)
+                .onOpenURL { url in
+                    if url.isFileURL {
+                        viewModel.analyzeExternalURLs([url])
+                    } else {
+                        let custom = ExternalOpenResolver.urls(from: url)
+                        viewModel.analyzeExternalURLs(custom.isEmpty ? [url] : custom)
+                    }
+                }
         }
         .windowStyle(.titleBar)
         .defaultSize(width: 1280, height: 860)

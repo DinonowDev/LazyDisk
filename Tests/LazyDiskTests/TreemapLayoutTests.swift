@@ -31,13 +31,29 @@ final class TreemapLayoutTests: XCTestCase {
         let bounds = CGRect(x: 0, y: 0, width: 300, height: 200)
         let rects = TreemapLayoutEngine.layout(items: [large, small], in: bounds, padding: 0)
 
-        guard let largeRect = rects.first(where: { $0.item.id == large.id }),
-              let smallRect = rects.first(where: { $0.item.id == small.id }) else {
+        guard let largeRect = rects.first(where: { $0.item.id == large.id && $0.depth == 0 }),
+              let smallRect = rects.first(where: { $0.item.id == small.id && $0.depth == 0 }) else {
             return XCTFail("Missing rects")
         }
 
         let largeArea = largeRect.rect.width * largeRect.rect.height
         let smallArea = smallRect.rect.width * smallRect.rect.height
         XCTAssertGreaterThan(largeArea, smallArea)
+    }
+
+    func testHierarchicalLayoutAddsChildRects() {
+        let parent = DiskItem(url: URL(fileURLWithPath: "/Users"), size: 100, isDirectory: true)
+        let child = DiskItem(url: URL(fileURLWithPath: "/Users/me"), size: 60, isDirectory: true)
+        let bounds = CGRect(x: 0, y: 0, width: 400, height: 300)
+
+        let rects = TreemapLayoutEngine.layoutHierarchical(
+            items: [parent],
+            childrenByParentPath: [PathUtils.resolved(parent.url).path: [child]],
+            in: bounds,
+            padding: 2
+        )
+
+        XCTAssertTrue(rects.contains { $0.item.id == parent.id && $0.depth == 0 })
+        XCTAssertTrue(rects.contains { $0.item.id == child.id && $0.depth == 1 })
     }
 }

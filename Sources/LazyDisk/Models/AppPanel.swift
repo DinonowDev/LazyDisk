@@ -31,4 +31,11 @@ enum AppPanel: String, CaseIterable, Identifiable, Sendable {
         case .goal: return "target"
         }
     }
+
+    var showsCollector: Bool {
+        switch self {
+        case .browser, .cleanup, .dev, .goal: return true
+        default: return false
+        }
+    }
 }

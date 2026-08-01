@@ -20,7 +20,7 @@ struct SmartCollectionsSection: View {
                         .textCase(.uppercase)
                     Spacer()
                     if viewModel.isScanningSmartCollection {
-                        ProgressView().scaleEffect(0.45).frame(width: 12, height: 12)
+                        CompactProgressView(size: 12)
                     }
                 }
             }

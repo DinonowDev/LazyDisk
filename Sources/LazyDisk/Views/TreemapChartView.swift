@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TreemapChartView: View {
     let items: [DiskItem]
+    let childrenByParentPath: [String: [DiskItem]]
     let totalSize: Int64
     var hoveredID: UUID?
     var onHover: (UUID?) -> Void
@@ -9,7 +10,6 @@ struct TreemapChartView: View {
     var onAddToCollector: ((DiskItem) -> Void)?
 
     @State private var animationProgress: CGFloat = 0
-    @State private var layoutBounds: CGRect = .zero
     @State private var isPointerOver = false
     @State private var pointerHoveredID: UUID?
 
@@ -45,64 +45,92 @@ struct TreemapChartView: View {
                     let newID = hitTest(at: location, in: bounds)?.id
                     guard pointerHoveredID != newID else { return }
                     pointerHoveredID = newID
-                    onHover(newID)
+                    Task { @MainActor in onHover(newID) }
                 case .ended:
                     isPointerOver = false
                     pointerHoveredID = nil
-                    onHover(nil)
+                    Task { @MainActor in onHover(nil) }
                 }
             }
             .onAppear {
-                layoutBounds = bounds
                 withAnimation(.spring(response: 0.7, dampingFraction: 0.8)) { animationProgress = 1 }
             }
-            .onChange(of: geometry.size) { _ in
-                layoutBounds = bounds
-            }
             .onChange(of: items.map(\.id)) { _ in
+                animationProgress = 0
+                withAnimation(.spring(response: 0.65, dampingFraction: 0.82)) { animationProgress = 1 }
+            }
+            .onChange(of: childrenByParentPath.keys.sorted()) { _ in
                 animationProgress = 0
                 withAnimation(.spring(response: 0.65, dampingFraction: 0.82)) { animationProgress = 1 }
             }
         }
     }
 
+    private func layoutRects(in bounds: CGRect) -> [TreemapRect] {
+        let fitted = fittedBounds(bounds)
+        return TreemapLayoutEngine.layoutHierarchical(
+            items: items,
+            childrenByParentPath: childrenByParentPath,
+            in: fitted,
+            padding: 3
+        )
+    }
+
+    private func fittedBounds(_ bounds: CGRect) -> CGRect {
+        let w = bounds.width * ChartMetrics.treemapFillRatio
+        let h = bounds.height * ChartMetrics.treemapFillRatio
+        return CGRect(
+            x: bounds.midX - w / 2,
+            y: bounds.midY - h / 2,
+            width: w,
+            height: h
+        )
+    }
+
     private func tilesLayer(in bounds: CGRect) -> some View {
-        let rects = TreemapLayoutEngine.layout(items: items, in: bounds, padding: 3)
+        let rects = layoutRects(in: bounds)
 
         return ZStack(alignment: .topLeading) {
             ForEach(rects) { tile in
                 let isHovered = effectiveHoveredID == tile.item.id
                 let dimmed = effectiveHoveredID != nil && !isHovered
                 let animatedRect = scaledRect(tile.rect, progress: animationProgress, in: bounds)
+                let hasNestedChildren = tile.depth == 0
+                    && childrenByParentPath[PathUtils.resolved(tile.item.url).path] != nil
+                let showLabel = shouldShowLabel(for: tile, hasNestedChildren: hasNestedChildren)
 
                 ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(DiskColors.gradient(for: tile.colorIndex))
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Color.white.opacity(isHovered ? 0.5 : 0.2), lineWidth: isHovered ? 2 : 1)
+                    RoundedRectangle(cornerRadius: tile.depth == 0 ? 6 : 4, style: .continuous)
+                        .fill(DiskColors.gradient(for: tile.colorIndex, depth: tile.depth))
+                    RoundedRectangle(cornerRadius: tile.depth == 0 ? 6 : 4, style: .continuous)
+                        .stroke(
+                            Color.white.opacity(isHovered ? 0.55 : (tile.depth == 0 ? 0.22 : 0.35)),
+                            lineWidth: isHovered ? 2 : (tile.depth == 0 ? 1 : 0.75)
+                        )
 
-                    if animatedRect.width > 50 && animatedRect.height > 28 {
+                    if showLabel {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(tile.item.displayName)
-                                .font(.system(size: 10, weight: isHovered ? .bold : .semibold))
+                                .font(.system(size: tile.depth == 0 ? 10 : 9, weight: isHovered ? .bold : .semibold))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .minimumScaleFactor(0.75)
                             Text(tile.item.formattedSize)
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .font(.system(size: tile.depth == 0 ? 9 : 8, weight: .medium, design: .monospaced))
                                 .opacity(0.85)
                                 .environment(\.layoutDirection, .leftToRight)
                         }
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
-                        .padding(6)
+                        .padding(tile.depth == 0 ? 6 : 4)
                     }
                 }
                 .frame(width: animatedRect.width, height: animatedRect.height)
                 .position(x: animatedRect.midX, y: animatedRect.midY)
                 .scaleEffect(isHovered ? 1.02 : 1)
-                .opacity(dimmed ? 0.45 : 1)
+                .opacity(dimmed ? 0.45 : (hasNestedChildren && tile.depth == 0 ? 0.92 : 1))
                 .animation(.easeOut(duration: 0.12), value: isHovered)
+                .zIndex(Double(tile.depth))
                 .onDrag { NSItemProvider(object: tile.item.url as NSURL) }
                 .contextMenu {
                     if !tile.item.isVirtual {
@@ -114,6 +142,14 @@ struct TreemapChartView: View {
         }
     }
 
+    private func shouldShowLabel(for tile: TreemapRect, hasNestedChildren: Bool) -> Bool {
+        let rect = tile.rect
+        if tile.depth == 0 {
+            return !hasNestedChildren && rect.width > 50 && rect.height > 28
+        }
+        return rect.width > 36 && rect.height > 22
+    }
+
     private func scaledRect(_ rect: CGRect, progress: CGFloat, in bounds: CGRect) -> CGRect {
         let w = rect.width * progress
         let h = rect.height * progress
@@ -121,7 +157,7 @@ struct TreemapChartView: View {
     }
 
     private func hitTest(at point: CGPoint, in bounds: CGRect) -> DiskItem? {
-        let rects = TreemapLayoutEngine.layout(items: items, in: bounds, padding: 3)
+        let rects = layoutRects(in: bounds)
         for tile in rects.reversed() {
             let r = scaledRect(tile.rect, progress: animationProgress, in: bounds)
             if r.contains(point) { return tile.item }

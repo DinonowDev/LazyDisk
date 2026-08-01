@@ -48,12 +48,17 @@ struct ScanDiffView: View {
         }
         .onAppear {
             if viewModel.scanSnapshots.isEmpty {
-                viewModel.loadScanHistory()
+                Task { @MainActor in
+                    await Task.yield()
+                    viewModel.loadScanHistory()
+                }
             }
         }
         .onChange(of: viewModel.selectedSnapshotID) { id in
             guard let id, let snapshot = viewModel.scanSnapshots.first(where: { $0.id == id }) else { return }
-            viewModel.updateScanDiff(with: snapshot)
+            Task { @MainActor in
+                viewModel.updateScanDiff(with: snapshot)
+            }
         }
     }
 

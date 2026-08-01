@@ -153,6 +153,132 @@ enum L10n {
     static var devTitle: String { t(.devTitle) }
     static var devScan: String { t(.devScan) }
     static var devEmpty: String { t(.devEmpty) }
+    static var devEmptyDesc: String { t(.devEmptyDesc) }
+    static var devReclaimable: String { t(.devReclaimable) }
+    static var devItemsLabel: String { t(.devItemsLabel) }
+    static var devProjectsLabel: String { t(.devProjectsLabel) }
+    static var devGlobalLabel: String { t(.devGlobalLabel) }
+    static var devFilterAll: String { t(.devFilterAll) }
+    static var devGroupByProject: String { t(.devGroupByProject) }
+    static var devGroupByType: String { t(.devGroupByType) }
+    static var devGlobalCaches: String { t(.devGlobalCaches) }
+    static var devGlobalCachesDesc: String { t(.devGlobalCachesDesc) }
+
+    static func devSummarySubtitle(items: Int, projects: Int, size: String) -> String {
+        String(format: t(.devSummarySubtitle), items, projects, size)
+    }
+
+    static func devItemsCount(_ count: Int) -> String {
+        String(format: t(.devItemsCount), count)
+    }
+
+    static func devModifiedFmt(_ date: Date) -> String {
+        let fmt = DateFormatter()
+        fmt.dateStyle = .short
+        fmt.timeStyle = .none
+        return String(format: t(.devModifiedFmt), fmt.string(from: date))
+    }
+
+    static func devEcoName(_ eco: DevJunkEcosystem) -> String {
+        switch eco {
+        case .javascript: return t(.devEcoJavaScript)
+        case .typescript: return t(.devEcoTypeScript)
+        case .python: return t(.devEcoPython)
+        case .rust: return t(.devEcoRust)
+        case .go: return t(.devEcoGo)
+        case .swift: return t(.devEcoSwift)
+        case .java: return t(.devEcoJava)
+        case .kotlin: return t(.devEcoKotlin)
+        case .ruby: return t(.devEcoRuby)
+        case .php: return t(.devEcoPHP)
+        case .dart: return t(.devEcoDart)
+        case .docker: return t(.devEcoDocker)
+        case .homebrew: return t(.devEcoHomebrew)
+        case .ios: return t(.devEcoIOS)
+        case .android: return t(.devEcoAndroid)
+        case .web: return t(.devEcoWeb)
+        case .csharp: return t(.devEcoCSharp)
+        case .general: return t(.devEcoGeneral)
+        }
+    }
+
+    static func devPurposeName(_ purpose: DevJunkPurpose) -> String {
+        switch purpose {
+        case .dependencies: return t(.devPurposeDependencies)
+        case .buildOutput: return t(.devPurposeBuildOutput)
+        case .buildCache: return t(.devPurposeBuildCache)
+        case .devServerCache: return t(.devPurposeDevServer)
+        case .testCache: return t(.devPurposeTestCache)
+        case .languageCache: return t(.devPurposeLangCache)
+        case .packageManager: return t(.devPurposePackageManager)
+        case .runtimeData: return t(.devPurposeRuntime)
+        case .tooling: return t(.devPurposeTooling)
+        }
+    }
+
+    static func devPurposeDesc(_ purpose: DevJunkPurpose) -> String {
+        switch purpose {
+        case .dependencies: return t(.devPurposeDescDependencies)
+        case .buildOutput: return t(.devPurposeDescBuildOutput)
+        case .buildCache: return t(.devPurposeDescBuildCache)
+        case .devServerCache: return t(.devPurposeDescDevServer)
+        case .testCache: return t(.devPurposeDescTestCache)
+        case .languageCache: return t(.devPurposeDescLangCache)
+        case .packageManager: return t(.devPurposeDescPackageManager)
+        case .runtimeData: return t(.devPurposeDescRuntime)
+        case .tooling: return t(.devPurposeDescTooling)
+        }
+    }
+
+    static func devSafetyName(_ safety: DevJunkSafety) -> String {
+        switch safety {
+        case .safe: return t(.devSafetySafe)
+        case .rebuild: return t(.devSafetyRebuild)
+        case .caution: return t(.devSafetyCaution)
+        }
+    }
+
+    static func devFolderDesc(_ kind: DevJunkFolderKind) -> String {
+        switch kind {
+        case .nodeModules: return t(.devDescNodeModules)
+        case .swiftBuild: return t(.devDescSwiftBuild)
+        case .pycache: return t(.devDescPycache)
+        case .venv: return t(.devDescVenv)
+        case .next: return t(.devDescNext)
+        case .turbo: return t(.devDescTurbo)
+        case .pods: return t(.devDescPods)
+        case .carthage: return t(.devDescCarthage)
+        case .gradle: return t(.devDescGradle)
+        case .rustTarget: return t(.devDescRustTarget)
+        case .dist: return t(.devDescDist)
+        case .build: return t(.devDescBuild)
+        case .pytestCache: return t(.devDescPytestCache)
+        case .mypyCache: return t(.devDescMypyCache)
+        case .tox: return t(.devDescTox)
+        case .cargoRegistry: return t(.devDescCargoRegistry)
+        case .vendor: return t(.devDescVendor)
+        case .bowerComponents: return t(.devDescBowerComponents)
+        case .parcelCache: return t(.devDescParcelCache)
+        case .nuxt: return t(.devDescNuxt)
+        case .output: return t(.devDescOutput)
+        case .cmakeDebug: return t(.devDescCmakeDebug)
+        case .cmakeRelease: return t(.devDescCmakeRelease)
+        case .swiftpm: return t(.devDescSwiftpm)
+        case .packageResolved: return t(.devDescPackageResolved)
+        case .goPkgMod: return t(.devDescGoPkgMod)
+        case .homebrewCache: return t(.devDescHomebrewCache)
+        case .dockerData: return t(.devDescDockerData)
+        case .gradleGlobal: return t(.devDescGradleGlobal)
+        case .cargoDir: return t(.devDescCargoDir)
+        case .generic: return t(.devDescGeneric)
+        }
+    }
+
+    static var devInCollector: String { t(.devInCollector) }
+
+    static func devCollectorCount(_ count: Int) -> String {
+        String(format: t(.devCollectorCount), count)
+    }
 
     // Goal
     static var goalTitle: String { t(.goalTitle) }
@@ -337,6 +463,9 @@ enum L10n {
 
     static var cleanupCollectionsHint: String { t(.cleanupCollectionsHint) }
     static var devCollectionsHint: String { t(.devCollectionsHint) }
+
+    static var finderAnalyzeVolumeNotFound: String { t(.finderAnalyzeVolumeNotFound) }
+    static var finderAnalyzeHelp: String { t(.finderAnalyzeHelp) }
 
     static var menuAbout: String { t(.menuAbout) }
     static var aboutTagline: String { t(.aboutTagline) }

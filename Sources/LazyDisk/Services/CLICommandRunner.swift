@@ -91,12 +91,24 @@ enum CLICommandRunner {
         if args.contains("--dev") {
             let items = await DevModeService.scan()
             if json {
-                let payload = items.map { ["name": $0.name, "path": $0.url.path, "size": $0.size, "category": $0.category] }
+                let payload = items.map { item in
+                    [
+                        "name": item.name,
+                        "path": item.url.path,
+                        "size": item.size,
+                        "ecosystem": L10n.devEcoName(item.ecosystem),
+                        "purpose": L10n.devPurposeName(item.purpose),
+                        "safety": L10n.devSafetyName(item.safety),
+                        "project": item.projectName ?? "",
+                        "description": L10n.devFolderDesc(item.folderKind),
+                    ] as [String: Any]
+                }
                 print(jsonString(payload) ?? "[]")
             } else {
                 print("Developer junk:")
                 for item in items.prefix(top) {
-                    print("  \(ByteFormatter.string(from: item.size))\t\(item.name) [\(item.category)]")
+                    let project = item.projectName.map { " · \($0)" } ?? ""
+                    print("  \(ByteFormatter.string(from: item.size))\t\(item.name) [\(L10n.devEcoName(item.ecosystem)) · \(L10n.devPurposeName(item.purpose))]\(project)")
                 }
             }
             return

@@ -47,7 +47,7 @@ struct GlobalSearchResultsView: View {
 
             if viewModel.isBuildingSearchIndex {
                 HStack(spacing: 4) {
-                    ProgressView().scaleEffect(0.5).frame(width: 12, height: 12)
+                    CompactProgressView(size: 12)
                     Text(viewModel.searchIndexStatus)
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)

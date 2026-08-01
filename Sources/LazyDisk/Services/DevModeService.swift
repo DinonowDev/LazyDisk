@@ -1,13 +1,5 @@
 import Foundation
 
-struct DevJunkItem: Identifiable, Sendable {
-    let id = UUID()
-    let url: URL
-    let name: String
-    let category: String
-    var size: Int64
-}
-
 struct DevScanProgress: Sendable {
     let scannedDirs: Int
     let found: Int
@@ -16,14 +8,6 @@ struct DevScanProgress: Sendable {
 }
 
 enum DevModeService {
-    private static let junkFolderNames: Set<String> = [
-        "node_modules", ".build", "DerivedData", "__pycache__", ".venv", "venv",
-        ".next", ".turbo", "Pods", "Carthage", ".gradle", "target", "dist",
-        "build", ".pytest_cache", ".mypy_cache", ".tox", ".cargo", "vendor",
-        "bower_components", ".parcel-cache", ".nuxt", ".output", "cmake-build-debug",
-        "cmake-build-release", ".swiftpm", "Package.resolved"
-    ]
-
     private static let minSize: Int64 = 5 * 1024 * 1024
 
     private static func homePaths(_ components: String...) -> URL {
@@ -39,28 +23,20 @@ enum DevModeService {
         var seen = Set<String>()
         let searchRoots = roots ?? defaultRoots()
 
-        // Fixed Xcode paths are scanned via Smart Collections (.xcode) in the Browser panel.
-        let specific: [(String, String, URL)] = [
-            (".gradle", "Android/Java", homePaths(".gradle")),
-            ("Cargo registry", "Rust", homePaths(".cargo/registry")),
-            ("Go pkg mod", "Go", homePaths("go/pkg/mod")),
-            ("Homebrew cache", "Homebrew", homePaths("Library/Caches/Homebrew")),
-            ("Docker", "Docker", homePaths("Library/Containers/com.docker.docker")),
-        ]
-
-        for (name, category, url) in specific {
+        for (name, url) in DevJunkMetadata.globalScanTargets() {
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
             let path = url.path
             guard !seen.contains(path) else { continue }
             let size = await scanner.calculateSize(for: url)
             if size >= minSize {
                 seen.insert(path)
-                results.append(DevJunkItem(url: url, name: name, category: category, size: size))
+                results.append(DevJunkMetadata.makeItem(url: url, name: name, size: size, isGlobal: true, globalName: name))
             }
         }
 
         var scannedDirs = 0
         let fm = FileManager.default
+        let junkNames = DevJunkMetadata.scannableFolderNames
 
         for root in searchRoots {
             var queue: [URL] = [root]
@@ -90,25 +66,19 @@ enum DevModeService {
 
                 for url in contents {
                     let name = url.lastPathComponent
-                    if junkFolderNames.contains(name) {
+                    if junkNames.contains(name) {
                         let fullPath = url.path
                         guard !seen.contains(fullPath) else { continue }
                         let size = await scanner.calculateSize(for: url)
                         if size >= minSize {
                             seen.insert(fullPath)
-                            results.append(DevJunkItem(
-                                url: url,
-                                name: name,
-                                category: url.deletingLastPathComponent().lastPathComponent,
-                                size: size
-                            ))
+                            results.append(DevJunkMetadata.makeItem(url: url, name: name, size: size))
                         }
                         continue
                     }
 
                     let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
                     if values?.isDirectory == true {
-                        // Skip known huge system dirs
                         if name == ".git" || name == "Library" && current.path == fm.homeDirectoryForCurrentUser.path {
                             continue
                         }

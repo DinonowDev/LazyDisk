@@ -75,7 +75,7 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var bookmarks: [FolderBookmark] = NavigationHistoryService.bookmarks()
 
     @Published var exportMessage: String?
-    @Published var sunburstChildMap: [UUID: [DiskItem]] = [:]
+    @Published var chartChildMap: [String: [DiskItem]] = [:]
 
     // Smart collections
     @Published var activeSmartCollection: SmartCollection?
@@ -89,6 +89,7 @@ final class DiskBrowserViewModel: ObservableObject {
 
     private var scanTask: Task<Void, Never>?
     private var prefetchTask: Task<Void, Never>?
+    private var chartChildRefreshTask: Task<Void, Never>?
     private var searchDebounceTask: Task<Void, Never>?
     private var globalSearchTask: Task<Void, Never>?
     private var indexBuildTask: Task<Void, Never>?
@@ -105,8 +106,29 @@ final class DiskBrowserViewModel: ObservableObject {
     private let fsMonitor = FilesystemChangeMonitor()
     private var fsRefreshTask: Task<Void, Never>?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var externalOpenObserver: NSObjectProtocol?
+    private var pendingExternalAnalyzeURL: URL?
     private static let chartOtherGroupID = UUID(uuidString: "A0000000-0000-4000-8000-000000000001")!
     private let chartSmallItemThresholdPercent = 2.0
+
+    init() {
+        externalOpenObserver = NotificationCenter.default.addObserver(
+            forName: .lazyDiskAnalyzeExternalURLs,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let urls = notification.object as? [URL] else { return }
+            Task { @MainActor in
+                self?.analyzeExternalURLs(urls)
+            }
+        }
+    }
+
+    deinit {
+        if let externalOpenObserver {
+            NotificationCenter.default.removeObserver(externalOpenObserver)
+        }
+    }
 
     var isAtVolumeRoot: Bool {
         guard let currentPath, let volume = selectedVolume else { return false }
@@ -257,7 +279,7 @@ final class DiskBrowserViewModel: ObservableObject {
         SunburstLayoutEngine.build(
             items: chartItems,
             totalSize: displayTotalSize,
-            childrenByParentID: sunburstChildMap
+            childrenByParentPath: chartChildMap
         )
     }
 
@@ -291,32 +313,147 @@ final class DiskBrowserViewModel: ObservableObject {
     func setChartStyle(_ style: ChartStyle) {
         chartStyle = style
         savePreferences()
-        if style == .sunburst {
-            refreshSunburstChildren()
+        if style == .sunburst || style == .treemap {
+            refreshChartChildren()
+        } else if !chartChildMap.isEmpty {
+            clearChartChildMap()
         }
     }
 
-    func refreshSunburstChildren() {
-        guard chartStyle == .sunburst else {
-            sunburstChildMap = [:]
+    func refreshChartChildren() {
+        guard chartStyle == .sunburst || chartStyle == .treemap else {
+            clearChartChildMap()
             return
         }
+
+        chartChildRefreshTask?.cancel()
         let parents = chartItems.filter { $0.isDirectory && !$0.isVirtual }
-        Task {
-            var map: [UUID: [DiskItem]] = [:]
+
+        chartChildRefreshTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !Task.isCancelled else { return }
+
+            var newMap: [String: [DiskItem]] = [:]
+
             for item in parents {
-                if let cached = await cache.get(item.url) {
-                    let children = cached.entries
-                        .filter { !$0.isVirtual && ($0.size > 0 || $0.isDirectory) }
-                        .sorted { $0.size > $1.size }
-                        .prefix(8)
-                    if !children.isEmpty {
-                        map[item.id] = Array(children)
-                    }
+                guard !Task.isCancelled else { return }
+
+                let folderURL = PathUtils.resolved(item.url)
+                let parentPath = folderURL.path
+                let entries: [DiskItem]
+
+                if let cached = await cache.get(folderURL) {
+                    entries = cached.entries
+                } else {
+                    let listed = await scanner.listDirectory(at: folderURL)
+                    guard !Task.isCancelled else { return }
+
+                    let scanned = await scanner.scanDirectorySizes(
+                        items: listed,
+                        parallelism: AppPreferences.load().scanParallelism
+                    )
+                    guard !Task.isCancelled else { return }
+
+                    let sorted = scanned.sorted { $0.size > $1.size }
+                    let cachedDirectory = CachedDirectory(
+                        url: folderURL,
+                        entries: sorted,
+                        scannedAt: Date(),
+                        isVolumeRoot: false
+                    )
+                    guard await cache.isComplete(cachedDirectory) else { continue }
+
+                    await cache.set(folderURL, entries: sorted, isVolumeRoot: false)
+                    entries = sorted
+                }
+
+                let children = chartChildren(from: entries)
+                if !children.isEmpty {
+                    newMap[parentPath] = children
                 }
             }
-            sunburstChildMap = map
+
+            guard !Task.isCancelled else { return }
+            publishChartChildMap(newMap)
         }
+    }
+
+    func setHoveredID(_ id: UUID?) {
+        guard hoveredID != id else { return }
+        publishAfterCurrentUpdate { [weak self] in
+            self?.hoveredID = id
+        }
+    }
+
+    func setHoveredID(_ id: UUID?, keyboardIndex: Int) {
+        guard hoveredID != id || keyboardFocusedIndex != keyboardIndex else { return }
+        publishAfterCurrentUpdate { [weak self] in
+            guard let self else { return }
+            withAnimation(.easeOut(duration: 0.15)) {
+                self.hoveredID = id
+                self.keyboardFocusedIndex = keyboardIndex
+            }
+        }
+    }
+
+    func setSearchFieldFocused(_ focused: Bool) {
+        guard isSearchFieldFocused != focused else { return }
+        publishAfterCurrentUpdate { [weak self] in
+            self?.isSearchFieldFocused = focused
+        }
+    }
+
+    func refreshPermissionsDeferred() {
+        publishAfterCurrentUpdate { [weak self] in
+            self?.refreshPermissions()
+        }
+    }
+
+    private func publishAfterCurrentUpdate(_ update: @escaping () -> Void) {
+        DispatchQueue.main.async(execute: update)
+    }
+
+    private func publishScanProgress(
+        _ update: ScanProgressUpdate,
+        trackDetailedProgress: Bool,
+        generation: UInt?
+    ) {
+        publishAfterCurrentUpdate { [weak self] in
+            guard let self else { return }
+            guard generation == nil || generation == self.navigationGeneration else { return }
+
+            if trackDetailedProgress {
+                self.scanProgressFraction = 0.1 + update.fraction * 0.75
+                self.scanCurrentFolder = update.currentName
+                self.scanProgress = L10n.scanFoldersProgress(update.completed, update.total)
+            }
+
+            if let index = update.itemIndex, index < self.entries.count {
+                self.entries[index].size = update.itemSize ?? self.entries[index].size
+                self.entries[index].isScanning = false
+                self.entries = self.sortOrder.sort(self.entries)
+            }
+        }
+    }
+
+    private func clearChartChildMap() {
+        publishChartChildMap([:])
+    }
+
+    private func publishChartChildMap(_ newMap: [String: [DiskItem]]) {
+        guard chartChildMap != newMap else { return }
+        publishAfterCurrentUpdate { [weak self] in
+            self?.chartChildMap = newMap
+        }
+    }
+
+    private func chartChildren(from entries: [DiskItem]) -> [DiskItem] {
+        Array(
+            entries
+                .filter { !$0.isVirtual && ($0.size > 0 || $0.isDirectory) }
+                .sorted { $0.size > $1.size }
+                .prefix(8)
+        )
     }
 
     func bindSearchDebounce() {
@@ -396,10 +533,10 @@ final class DiskBrowserViewModel: ObservableObject {
             isBuildingSearchIndex = true
             searchIndexStatus = L10n.searchIndexing
 
-            await globalSearch.buildIndex(for: volume, includeHidden: AppPreferences.load().showHiddenFiles) { progress in
-                Task { @MainActor in
-                    self.searchIndexEntryCount = progress.foundEntries
-                    self.searchIndexStatus = "\(progress.foundEntries) files · \(progress.currentPath)"
+            await globalSearch.buildIndex(for: volume, includeHidden: AppPreferences.load().showHiddenFiles) { [weak self] progress in
+                DispatchQueue.main.async {
+                    self?.searchIndexEntryCount = progress.foundEntries
+                    self?.searchIndexStatus = "\(progress.foundEntries) files · \(progress.currentPath)"
                 }
             }
 
@@ -518,6 +655,7 @@ final class DiskBrowserViewModel: ObservableObject {
             isLoading = false
             scanProgress = ""
             scanProgressFraction = 1
+            applyPendingExternalAnalyzeIfNeeded()
         }
     }
 
@@ -555,7 +693,56 @@ final class DiskBrowserViewModel: ObservableObject {
             saveScanSnapshot(volume: volume)
             appPhase = .ready
             isLoading = false
+            applyPendingExternalAnalyzeIfNeeded()
         }
+    }
+
+    // MARK: - Finder / external open
+
+    func analyzeExternalURLs(_ urls: [URL]) {
+        let targets = urls.map { ExternalOpenResolver.analyzeTarget(for: $0) }
+        guard let target = targets.first else { return }
+
+        activePanel = .browser
+        NSApp.activate(ignoringOtherApps: true)
+
+        Task {
+            if volumes.isEmpty {
+                volumes = await scanner.listVolumes()
+            }
+
+            let volumeRoots = volumes.map {
+                ExternalOpenResolver.VolumeRoot(id: $0.id, scanRoot: $0.scanRoot)
+            }
+            guard let volumeID = ExternalOpenResolver.containingVolumeID(for: target, volumes: volumeRoots),
+                  let volume = volumes.first(where: { $0.id == volumeID }) else {
+                errorMessage = L10n.finderAnalyzeVolumeNotFound
+                return
+            }
+
+            selectedVolume = volume
+            pendingExternalAnalyzeURL = target
+
+            switch appPhase {
+            case .ready:
+                pendingExternalAnalyzeURL = nil
+                navigate(to: target)
+            case .welcome, .permissions:
+                if appPhase != .scanning {
+                    startInitialScan()
+                }
+            case .scanning:
+                break
+            }
+        }
+    }
+
+    private func applyPendingExternalAnalyzeIfNeeded() {
+        guard appPhase == .ready, let target = pendingExternalAnalyzeURL else { return }
+        pendingExternalAnalyzeURL = nil
+        guard let volume = selectedVolume,
+              PathUtils.isWithinVolume(target, scanRoot: volume.scanRoot) else { return }
+        navigate(to: target)
     }
 
     // MARK: - Navigation
@@ -730,7 +917,7 @@ final class DiskBrowserViewModel: ObservableObject {
                 volumeRoot: volume.scanRoot,
                 scanRoot: scanRoot
             ) { [weak self] progress in
-                Task { @MainActor in
+                DispatchQueue.main.async {
                     self?.smartCollectionProgress = progress
                 }
             }
@@ -795,6 +982,25 @@ final class DiskBrowserViewModel: ObservableObject {
             collectorItems = CollectorService.merge(collectorItems, adding: item)
             isCollectorMinimized = false
             isCollectorExpanded = true
+        }
+    }
+
+    func isInCollector(url: URL) -> Bool {
+        CollectorService.contains(collectorItems, url: url)
+    }
+
+    func toggleCollector(url: URL) {
+        if isInCollector(url: url) {
+            removeFromCollector(url: url)
+        } else {
+            addToCollector(url: url)
+        }
+    }
+
+    func removeFromCollector(url: URL) {
+        let key = PathUtils.resolved(url).path
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            collectorItems.removeAll { PathUtils.resolved($0.url).path == key }
         }
     }
 
@@ -911,8 +1117,8 @@ final class DiskBrowserViewModel: ObservableObject {
 
     func moveKeyboardFocus(delta: Int) {
         guard !browserListEntries.isEmpty else { return }
-        keyboardFocusedIndex = max(0, min(browserListEntries.count - 1, keyboardFocusedIndex + delta))
-        hoveredID = browserListEntries[keyboardFocusedIndex].id
+        let newIndex = max(0, min(browserListEntries.count - 1, keyboardFocusedIndex + delta))
+        setHoveredID(browserListEntries[newIndex].id, keyboardIndex: newIndex)
     }
 
     func revealInFinder(_ item: DiskItem) {
@@ -929,7 +1135,7 @@ final class DiskBrowserViewModel: ObservableObject {
         cleanupProgress = nil
         cleanupTask = Task {
             cleanupSuggestions = await CleanupSuggestionService.scan(volumeRoot: volume.scanRoot) { [weak self] progress in
-                Task { @MainActor in self?.cleanupProgress = progress }
+                DispatchQueue.main.async { self?.cleanupProgress = progress }
             }
             guard !Task.isCancelled else { return }
             isScanningCleanup = false
@@ -963,7 +1169,7 @@ final class DiskBrowserViewModel: ObservableObject {
         duplicateProgress = nil
         duplicateTask = Task {
             duplicateGroups = await DuplicateFinderService.findDuplicates(in: volume.scanRoot) { [weak self] progress in
-                Task { @MainActor in self?.duplicateProgress = progress }
+                DispatchQueue.main.async { self?.duplicateProgress = progress }
             }
             guard !Task.isCancelled else { return }
             isScanningDuplicates = false
@@ -993,16 +1199,23 @@ final class DiskBrowserViewModel: ObservableObject {
         historyLoadedVolumeID = volume.id
         Task {
             let snapshots = await historyStore.snapshots(for: volume.id)
-            scanSnapshots = snapshots
-            if let first = snapshots.first {
-                selectedSnapshotID = first.id
-                updateScanDiff(with: first)
+            let first = snapshots.first
+            publishAfterCurrentUpdate { [weak self] in
+                guard let self else { return }
+                self.scanSnapshots = snapshots
+                if let first {
+                    self.selectedSnapshotID = first.id
+                    self.currentScanDiff = ScanHistoryDiff.computeDiff(current: self.entries, previous: first)
+                }
             }
         }
     }
 
     func updateScanDiff(with snapshot: ScanSnapshot) {
-        currentScanDiff = ScanHistoryDiff.computeDiff(current: entries, previous: snapshot)
+        let diff = ScanHistoryDiff.computeDiff(current: entries, previous: snapshot)
+        publishAfterCurrentUpdate { [weak self] in
+            self?.currentScanDiff = diff
+        }
     }
 
     private func saveScanSnapshot(volume: VolumeInfo) {
@@ -1023,7 +1236,7 @@ final class DiskBrowserViewModel: ObservableObject {
         let roots = selectedVolume.map { [$0.scanRoot] }
         devTask = Task {
             devJunkItems = await DevModeService.scan(roots: roots) { [weak self] progress in
-                Task { @MainActor in self?.devProgress = progress }
+                DispatchQueue.main.async { self?.devProgress = progress }
             }
             guard !Task.isCancelled else { return }
             isScanningDev = false
@@ -1040,7 +1253,7 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     func addDevJunk(_ item: DevJunkItem) {
-        addToCollector(url: item.url)
+        toggleCollector(url: item.url)
     }
 
     func addAllDevJunk() {
@@ -1219,7 +1432,6 @@ final class DiskBrowserViewModel: ObservableObject {
             )
         }
 
-        entries = merged
         await cache.set(normalized, entries: merged, isVolumeRoot: isAtVolumeRoot)
 
         let indicesToRecalc = merged.enumerated().compactMap { index, item -> Int? in
@@ -1231,22 +1443,28 @@ final class DiskBrowserViewModel: ObservableObject {
             return affected ? index : nil
         }
 
+        var updatedEntries = merged
         for index in indicesToRecalc {
-            guard index < entries.count else { continue }
-            let url = entries[index].url
-            entries[index].isScanning = true
+            guard index < updatedEntries.count else { continue }
+            let url = updatedEntries[index].url
             let size = await scanner.calculateSize(for: url)
-            guard let idx = entries.firstIndex(where: { $0.url == url }) else { continue }
-            entries[idx].size = size
-            entries[idx].isScanning = false
-            entries = sortOrder.sort(entries)
-            if isAtVolumeRoot {
-                entries = await scanner.reconcileWithVolumeUsage(
-                    items: entries,
-                    volume: volume,
-                    atVolumeRoot: true
-                )
-            }
+            guard let idx = updatedEntries.firstIndex(where: { $0.url == url }) else { continue }
+            updatedEntries[idx].size = size
+            updatedEntries[idx].isScanning = false
+        }
+
+        updatedEntries = sortOrder.sort(updatedEntries)
+        if isAtVolumeRoot {
+            updatedEntries = await scanner.reconcileWithVolumeUsage(
+                items: updatedEntries,
+                volume: volume,
+                atVolumeRoot: true
+            )
+        }
+
+        let finalEntries = updatedEntries
+        publishAfterCurrentUpdate { [weak self] in
+            self?.entries = finalEntries
         }
     }
 
@@ -1285,21 +1503,13 @@ final class DiskBrowserViewModel: ObservableObject {
         let scanned = await scanner.scanDirectorySizes(
             items: listed,
             parallelism: AppPreferences.load().scanParallelism
-        ) { [self] update in
-            Task { @MainActor in
-                guard generation == nil || generation == self.navigationGeneration else { return }
-
-                if trackDetailedProgress {
-                    self.scanProgressFraction = 0.1 + update.fraction * 0.75
-                    self.scanCurrentFolder = update.currentName
-                    self.scanProgress = L10n.scanFoldersProgress(update.completed, update.total)
-                }
-
-                if let index = update.itemIndex, index < self.entries.count {
-                    self.entries[index].size = update.itemSize ?? self.entries[index].size
-                    self.entries[index].isScanning = false
-                    self.entries = self.sortOrder.sort(self.entries)
-                }
+        ) { [weak self] update in
+            DispatchQueue.main.async {
+                self?.publishScanProgress(
+                    update,
+                    trackDetailedProgress: trackDetailedProgress,
+                    generation: generation
+                )
             }
         }
         guard !Task.isCancelled, generation == nil || generation == navigationGeneration else { return }
@@ -1334,7 +1544,7 @@ final class DiskBrowserViewModel: ObservableObject {
         prefetchTask?.cancel()
         let directories = items.filter { $0.isDirectory && !$0.isVirtual }
 
-        prefetchTask = Task {
+        prefetchTask = Task { @MainActor in
             let total = directories.count
             for (index, item) in directories.enumerated() {
                 guard !Task.isCancelled else { return }
@@ -1363,10 +1573,13 @@ final class DiskBrowserViewModel: ObservableObject {
                 await cache.set(folderURL, entries: sorted, isVolumeRoot: false)
 
                 if appPhase == .scanning {
-                    await MainActor.run {
-                        scanProgressFraction = 0.92 + (Double(index + 1) / Double(max(total, 1))) * 0.08
-                        scanCurrentFolder = item.name
-                        scanProgress = L10n.scanCachingFolders(index + 1, total)
+                    let fraction = 0.92 + (Double(index + 1) / Double(max(total, 1))) * 0.08
+                    let folderName = item.name
+                    let progressText = L10n.scanCachingFolders(index + 1, total)
+                    publishAfterCurrentUpdate { [weak self] in
+                        self?.scanProgressFraction = fraction
+                        self?.scanCurrentFolder = folderName
+                        self?.scanProgress = progressText
                     }
                 }
             }

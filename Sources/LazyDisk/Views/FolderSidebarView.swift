@@ -38,7 +38,9 @@ struct FolderSidebarView: View {
             )
             .padding(.horizontal, 12)
             .padding(.bottom, 4)
-            .onChange(of: searchFocused) { viewModel.isSearchFieldFocused = $0 }
+            .onChange(of: searchFocused) { focused in
+                viewModel.setSearchFieldFocused(focused)
+            }
             .onChange(of: viewModel.searchText) { _ in viewModel.bindSearchDebounce() }
 
             if !viewModel.isAtVolumeRoot {
@@ -111,7 +113,7 @@ struct FolderSidebarView: View {
 
                 HStack(spacing: 3) {
                     if viewModel.isLoading {
-                        ProgressView().scaleEffect(0.45).frame(width: 10, height: 10)
+                        CompactProgressView(size: 10)
                         Text(viewModel.scanProgress.isEmpty ? L10n.scanLive : viewModel.scanProgress)
                     } else {
                         if let collection = viewModel.activeSmartCollection {
@@ -202,7 +204,7 @@ struct FolderSidebarView: View {
     private var activeCollectionBanner: some View {
         HStack(spacing: 8) {
             if viewModel.isScanningSmartCollection {
-                ProgressView().scaleEffect(0.55)
+                CompactProgressView(size: 12)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.activeSmartCollection?.title ?? L10n.collectionActive)
@@ -263,9 +265,10 @@ struct FolderSidebarView: View {
                             )
                         }
                         .onHover { hovering in
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                viewModel.hoveredID = hovering ? item.id : nil
-                                if hovering { viewModel.keyboardFocusedIndex = index }
+                            if hovering {
+                                viewModel.setHoveredID(item.id, keyboardIndex: index)
+                            } else {
+                                viewModel.setHoveredID(nil)
                             }
                         }
                         .contextMenu { itemContextMenu(item) }
@@ -420,7 +423,7 @@ private struct FolderRowView: View {
 
                     if item.isScanning {
                         HStack(spacing: 4) {
-                            ProgressView().scaleEffect(0.45).frame(width: 10, height: 10)
+                            CompactProgressView(size: 10)
                             Text(L10n.scanning).font(.system(size: 9)).foregroundStyle(.secondary)
                         }
                     } else {

@@ -37,15 +37,16 @@ struct ContentView: View {
                         .allowsHitTesting(viewModel.activePanel == .goal)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
 
-                if viewModel.activePanel == .browser {
+                if viewModel.activePanel.showsCollector {
                     CollectorView()
                 }
             }
         }
         .background(chartBackgroundColor)
         .keyboardShortcuts()
-        .onAppear { viewModel.refreshPermissions() }
+        .onAppear { viewModel.refreshPermissionsDeferred() }
         .onDeleteCommand { viewModel.requestDelete() }
         .sheet(isPresented: $viewModel.showDeleteConfirmation) {
             DeleteConfirmationSheet()
@@ -174,9 +175,7 @@ struct ContentView: View {
 
             if viewModel.isLoading {
                 HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.65)
-                        .frame(width: 14, height: 14)
+                    CompactProgressView(size: 14)
                     Text(viewModel.scanProgress.isEmpty ? L10n.analyzing : viewModel.scanProgress)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -274,8 +273,6 @@ private struct ChartPanelView: View {
     @EnvironmentObject var viewModel: DiskBrowserViewModel
     let centerFolderName: String
 
-    @State private var chartHoveredID: UUID?
-
     var body: some View {
         VStack(spacing: 0) {
             DiskOverviewHeader(
@@ -287,7 +284,7 @@ private struct ChartPanelView: View {
             ChartLegendView(
                 items: viewModel.chartItems,
                 totalSize: viewModel.displayTotalSize,
-                hoveredID: chartHoveredID,
+                hoveredID: viewModel.hoveredID,
                 onHover: setChartHover,
                 onSelect: { item in
                     guard !item.isVirtual, item.isDirectory else { return }
@@ -295,78 +292,81 @@ private struct ChartPanelView: View {
                 }
             )
             .padding(.top, 12)
-            .padding(.bottom, 4)
+            .padding(.bottom, 16)
 
-            chartStylePicker
-                .padding(.bottom, 8)
-
-            Group {
-                if viewModel.chartStyle == .sunburst {
-                    SunburstChartView(
-                        segments: viewModel.sunburstSegments,
-                        totalSize: viewModel.displayTotalSize,
-                        centerTitle: centerFolderName,
-                        centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
-                        hoveredID: chartHoveredID,
-                        onHover: setChartHover,
-                        onSelect: chartItemSelected,
-                        onAddToCollector: { item in
-                            viewModel.addToCollector(item)
-                        }
-                    )
-                } else if viewModel.chartStyle == .treemap {
-                    TreemapChartView(
-                        items: viewModel.chartItems,
-                        totalSize: viewModel.displayTotalSize,
-                        hoveredID: chartHoveredID,
-                        onHover: setChartHover,
-                        onSelect: chartItemSelected,
-                        onAddToCollector: { item in
-                            viewModel.addToCollector(item)
-                        }
-                    )
-                } else {
-                    RoseChartView(
-                        items: viewModel.chartItems,
-                        totalSize: viewModel.displayTotalSize,
-                        centerTitle: centerFolderName,
-                        centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
-                        hoveredID: chartHoveredID,
-                        onHover: setChartHover,
-                        onSelect: chartItemSelected,
-                        onAddToCollector: { item in
-                            viewModel.addToCollector(item)
-                        }
-                    )
+            ZStack(alignment: chartPickerAlignment) {
+                Group {
+                    if viewModel.chartStyle == .sunburst {
+                        SunburstChartView(
+                            segments: viewModel.sunburstSegments,
+                            totalSize: viewModel.displayTotalSize,
+                            centerTitle: centerFolderName,
+                            centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                            hoveredID: viewModel.hoveredID,
+                            onHover: setChartHover,
+                            onSelect: chartItemSelected,
+                            onAddToCollector: { item in
+                                viewModel.addToCollector(item)
+                            }
+                        )
+                    } else if viewModel.chartStyle == .treemap {
+                        TreemapChartView(
+                            items: viewModel.chartItems,
+                            childrenByParentPath: viewModel.chartChildMap,
+                            totalSize: viewModel.displayTotalSize,
+                            hoveredID: viewModel.hoveredID,
+                            onHover: setChartHover,
+                            onSelect: chartItemSelected,
+                            onAddToCollector: { item in
+                                viewModel.addToCollector(item)
+                            }
+                        )
+                    } else {
+                        RoseChartView(
+                            items: viewModel.chartItems,
+                            totalSize: viewModel.displayTotalSize,
+                            centerTitle: centerFolderName,
+                            centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                            hoveredID: viewModel.hoveredID,
+                            onHover: setChartHover,
+                            onSelect: chartItemSelected,
+                            onAddToCollector: { item in
+                                viewModel.addToCollector(item)
+                            }
+                        )
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .animation(.easeInOut(duration: 0.25), value: viewModel.chartStyle)
+
+                ChartStylePicker(selection: Binding(
+                    get: { viewModel.chartStyle },
+                    set: { viewModel.setChartStyle($0) }
+                ))
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .animation(.easeInOut(duration: 0.25), value: viewModel.chartStyle)
 
             chartHint
         }
         .background { chartBackground }
-        .onAppear { viewModel.refreshSunburstChildren() }
-        .onChange(of: viewModel.chartItems.map(\.id)) { _ in
-            viewModel.refreshSunburstChildren()
-        }
-        .onChange(of: viewModel.chartStyle) { _ in
-            viewModel.refreshSunburstChildren()
-        }
-        .onChange(of: chartHoveredID) { newID in
-            guard viewModel.hoveredID != newID else { return }
-            viewModel.hoveredID = newID
-        }
-        .onChange(of: viewModel.hoveredID) { newID in
-            guard chartHoveredID != newID else { return }
-            chartHoveredID = newID
+        .task(id: chartChildrenRefreshKey) {
+            viewModel.refreshChartChildren()
         }
     }
 
+    private var chartChildrenRefreshKey: String {
+        let itemKey = viewModel.chartItems.map(\.id.uuidString).joined(separator: ",")
+        return "\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(itemKey)"
+    }
+
+    private var chartPickerAlignment: Alignment {
+        L10n.isRTL ? .topLeading : .topTrailing
+    }
+
     private func setChartHover(_ id: UUID?) {
-        guard chartHoveredID != id else { return }
-        chartHoveredID = id
+        viewModel.setHoveredID(id)
     }
 
     private func chartItemSelected(_ item: DiskItem) {
@@ -376,14 +376,6 @@ private struct ChartPanelView: View {
         } else {
             viewModel.selectItemForDetail(item)
         }
-    }
-
-    private var chartStylePicker: some View {
-        ChartStylePicker(selection: Binding(
-            get: { viewModel.chartStyle },
-            set: { viewModel.setChartStyle($0) }
-        ))
-        .padding(.horizontal, 20)
     }
 
     private var chartBackground: some View {

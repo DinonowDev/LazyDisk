@@ -102,9 +102,7 @@ struct SearchBarView: View {
                     .focused($isSearchFocused)
 
                     if isIndexing {
-                        ProgressView()
-                            .scaleEffect(0.45)
-                            .frame(width: 12, height: 12)
+                        CompactProgressView(size: 12)
                             .help(indexStatus)
                     }
 
