@@ -2,7 +2,11 @@
 
 A native macOS disk space analyzer and cleanup tool — inspired by DaisyDisk.
 
-![LazyDisk](assets/preview.png)
+![LazyDisk — Browse](assets/preview.png)
+
+| Browse | Smart Cleanup | Developer Junk |
+|--------|---------------|----------------|
+| ![Browse](assets/screenshot-browse.png) | ![Cleanup](assets/screenshot-cleanup.png) | ![Developer](assets/screenshot-developer.png) |
 
 ## Features
 
@@ -109,8 +113,10 @@ CI runs `swift build`, `swift test`, and `Scripts/build-app.sh` on macOS via Git
 
 Pre-built `.app` bundles are available on **[GitHub Releases](https://github.com/DinonowDev/LazyDisk/releases)**.
 
-1. Download the latest release artifact (`LazyDisk.app` or zip).
-2. Open `LazyDisk.app` (right-click → **Open** if Gatekeeper blocks unsigned builds).
+**Latest:** [v1.0.0](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-1.0.0-macos.zip` (macOS 13+, Apple Silicon & Intel)
+
+1. Download the latest release zip.
+2. Unzip and open `LazyDisk.app` (right-click → **Open** if Gatekeeper blocks unsigned builds).
 3. Optionally clear quarantine: `xattr -cr /path/to/LazyDisk.app`
 
 CI build artifacts are also attached to successful workflow runs under the **Actions** tab.
