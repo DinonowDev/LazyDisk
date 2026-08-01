@@ -43,28 +43,40 @@ struct SmartCollectionLinkBanner: View {
     let collections: [SmartCollection]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 8) {
+            Image(systemName: "link")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+
             Text(hint)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            HStack(spacing: 8) {
-                ForEach(collections) { collection in
-                    Button {
-                        viewModel.openSmartCollectionInBrowser(collection)
-                    } label: {
-                        Label(collection.title, systemImage: collection.icon)
-                            .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .layoutPriority(1)
+
+            ForEach(collections) { collection in
+                Button {
+                    viewModel.openSmartCollectionInBrowser(collection)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: collection.icon)
+                            .font(.system(size: 8, weight: .semibold))
+                        Text(collection.title)
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+                    .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.18), lineWidth: 1))
                 }
+                .buttonStyle(.plain)
             }
+
+            Spacer(minLength: 0)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.06)))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
     }
 }
 

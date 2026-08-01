@@ -12,6 +12,16 @@ extension DiskBrowserViewModel {
         prefs.contentFilter = contentFilter
         prefs.chartStyle = chartStyle
         prefs.searchScope = searchScope
+        prefs.browserSidebarWidth = Double(browserSidebarWidth)
+        prefs.save()
+    }
+
+    func saveSidebarWidth(_ width: CGFloat) {
+        let clamped = min(520, max(340, width))
+        guard abs(clamped - browserSidebarWidth) > 1 else { return }
+        browserSidebarWidth = clamped
+        var prefs = AppPreferences.load()
+        prefs.browserSidebarWidth = Double(clamped)
         prefs.save()
     }
 

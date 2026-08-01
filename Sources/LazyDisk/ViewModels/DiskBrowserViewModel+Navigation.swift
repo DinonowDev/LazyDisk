@@ -97,6 +97,11 @@ extension DiskBrowserViewModel {
     }
 
     func navigateUp() {
+        if isDetailPanelVisible {
+            closeDetailPanel()
+            return
+        }
+
         guard let currentPath, let volume = selectedVolume else { return }
         let parent = PathUtils.resolved(currentPath).deletingLastPathComponent()
 
@@ -126,7 +131,8 @@ extension DiskBrowserViewModel {
             lastSelectedIndex = index
             keyboardFocusedIndex = index
             if selectedIDs.count == 1, let id = selectedIDs.first,
-               let selected = browserListEntries.first(where: { $0.id == id }) {
+               let selected = browserListEntries.first(where: { $0.id == id }),
+               !selected.isDirectory {
                 detailItem = selected
                 isDetailPanelVisible = true
             }
@@ -138,7 +144,11 @@ extension DiskBrowserViewModel {
             return
         }
 
-        selectItemForDetail(item, at: index)
+        if item.isDirectory {
+            openItem(item)
+        } else {
+            selectItemForDetail(item, at: index)
+        }
     }
 
     func handleItemDoubleClick(_ item: DiskItem) {
@@ -154,6 +164,11 @@ extension DiskBrowserViewModel {
             lastSelectedIndex = index
             keyboardFocusedIndex = index
         }
+    }
+
+    func closeDetailPanel() {
+        detailItem = nil
+        isDetailPanelVisible = false
     }
 
     func showLargeFilesInFolder(_ item: DiskItem) {

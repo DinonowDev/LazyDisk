@@ -28,7 +28,7 @@ extension FolderSidebarView {
                 }
 
                 Button { viewModel.requestDelete() } label: {
-                    Label(L10n.moveToTrash, systemImage: "trash.fill")
+                    Label(L10n.deleteAction, systemImage: "trash.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }

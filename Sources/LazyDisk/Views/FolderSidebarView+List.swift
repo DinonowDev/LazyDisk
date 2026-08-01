@@ -59,15 +59,20 @@ extension FolderSidebarView {
 
     @ViewBuilder
     func itemContextMenu(_ item: DiskItem) -> some View {
-        Button(L10n.detailShowDetails) { viewModel.selectItemForDetail(item) }
-        Divider()
-        if item.isDirectory && !item.isVirtual { Button(L10n.open) { viewModel.openItem(item) } }
+        if item.isDirectory && !item.isVirtual {
+            Button(L10n.detailShowDetails) { viewModel.selectItemForDetail(item) }
+            Divider()
+            Button(L10n.open) { viewModel.openItem(item) }
+        } else {
+            Button(L10n.detailShowDetails) { viewModel.selectItemForDetail(item) }
+            Divider()
+        }
         Button(L10n.addToCollector) { viewModel.addToCollector(item) }
         Button(L10n.revealFinder) { viewModel.revealInFinder(item) }
         Button(L10n.quickLook) { QuickLookService.preview(urls: [item.url]) }
         if !item.isVirtual && CleanupService.canDelete(url: item.url) {
             Divider()
-            Button(L10n.moveToTrash, role: .destructive) {
+            Button(L10n.deleteAction, role: .destructive) {
                 viewModel.selectedIDs = [item.id]
                 viewModel.requestDelete()
             }

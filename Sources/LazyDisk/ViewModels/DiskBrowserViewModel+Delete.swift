@@ -1,6 +1,7 @@
-// DiskBrowserViewModel+Delete.swift — Trash deletion with safety warnings.
+// DiskBrowserViewModel+Delete.swift — Permanent deletion with safety warnings.
 import AppKit
 import Foundation
+import LazyDiskCore
 import SwiftUI
 
 extension DiskBrowserViewModel {
@@ -12,7 +13,10 @@ extension DiskBrowserViewModel {
             !$0.isVirtual && CleanupService.canDelete(url: $0.url)
         }
         guard !deletable.isEmpty else {
-            errorMessage = L10n.errorCannotDelete
+            let hasLibraryContainer = targets.contains { DeletePathAnalyzer.isLibraryContainerPath($0.url) }
+            errorMessage = hasLibraryContainer
+                ? L10n.errorCannotDeleteLibraryContainer
+                : L10n.errorCannotDelete
             return
         }
         pendingDeleteURLs = deletable.map(\.url)
@@ -25,7 +29,7 @@ extension DiskBrowserViewModel {
         guard !urls.isEmpty else { return }
 
         do {
-            _ = try CleanupService.moveToTrash(urls: urls)
+            try CleanupService.deleteItems(urls: urls)
             selectedIDs.removeAll()
             collectorItems.removeAll { item in urls.contains(item.url) }
             pendingDeleteURLs.removeAll()

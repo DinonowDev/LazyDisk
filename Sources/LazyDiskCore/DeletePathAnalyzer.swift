@@ -48,4 +48,14 @@ public enum DeletePathAnalyzer {
         ]
         return sensitive.contains { path.contains($0) }
     }
+
+    /// Standard macOS Library folders that must not be moved to Trash as a whole.
+    /// Delete individual items inside them (e.g. `~/Library/Caches/Homebrew`) instead.
+    public static func isLibraryContainerPath(_ url: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        if path.hasSuffix("/Library") { return true }
+        guard let range = path.range(of: "/Library/", options: .backwards) else { return false }
+        let tail = String(path[range.upperBound...])
+        return tail == "Caches" || tail == "Logs"
+    }
 }

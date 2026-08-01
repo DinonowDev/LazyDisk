@@ -77,7 +77,7 @@ enum L10n {
     static var deleteSafeMessage: String { t(.deleteSafeMessage) }
     static var deleteItemsHeader: String { t(.deleteItemsHeader) }
     static var cancel: String { t(.cancel) }
-    static var moveToTrash: String { t(.moveToTrash) }
+    static var deleteAction: String { t(.deleteAction) }
 
     // Hints
     static var hintSpace: String { t(.hintSpace) }
@@ -133,8 +133,15 @@ enum L10n {
     // Cleanup
     static var cleanupTitle: String { t(.cleanupTitle) }
     static var cleanupEmpty: String { t(.cleanupEmpty) }
+    static var cleanupEmptyDesc: String { t(.cleanupEmptyDesc) }
     static var cleanupAddAll: String { t(.cleanupAddAll) }
     static var cleanupScan: String { t(.cleanupScan) }
+    static var cleanupSortScore: String { t(.cleanupSortScore) }
+    static var cleanupBreakdown: String { t(.cleanupBreakdown) }
+    static func cleanupCategoryCount(_ count: Int) -> String { String(format: t(.cleanupCategoryCount), count) }
+    static func cleanupSummarySubtitle(items: Int, size: String) -> String {
+        String(format: t(.cleanupSummarySubtitle), items, size)
+    }
 
     // Duplicates
     static var dupTitle: String { t(.dupTitle) }
@@ -452,6 +459,7 @@ enum L10n {
     static func menuBarPercent(_ percent: Int) -> String { String(format: t(.menuBarPercent), percent) }
     static func errorDeleteFailed(_ msg: String) -> String { String(format: t(.errorDeleteFailed), msg) }
     static var errorCannotDelete: String { t(.errorCannotDelete) }
+    static var errorCannotDeleteLibraryContainer: String { t(.errorCannotDeleteLibraryContainer) }
     static func suggestionsCount(_ count: Int) -> String { String(format: t(.suggestionsCount), count) }
     static func scanProgressFmt(_ current: Int, _ total: Int) -> String { String(format: t(.scanProgressFmt), current, total) }
     static var itemsLabel: String { t(.items) }
@@ -500,10 +508,10 @@ enum L10n {
     static var warnLibraryMsg: String { t(.warnLibraryMsg) }
     static var warnBulkDeleteTitle: String { t(.warnBulkDeleteTitle) }
     static func warnBulkDeleteMsg(_ count: Int) -> String { String(format: t(.warnBulkDeleteMsg), count) }
-    static func deleteSummaryMove(count: Int, size: String) -> String {
+    static func deleteSummary(count: Int, size: String) -> String {
         count == 1
-            ? String(format: t(.deleteSummaryMoveOne), size)
-            : String(format: t(.deleteSummaryMoveMany), count, size)
+            ? String(format: t(.deleteSummaryOne), size)
+            : String(format: t(.deleteSummaryMany), count, size)
     }
 
     static var chartStyleRose: String { t(.chartStyleRose) }

@@ -73,14 +73,9 @@ struct ContentView: View {
                 recentBookmarksBar
                 FolderSidebarView()
             }
-            .frame(minWidth: 340, idealWidth: 420, maxWidth: 520)
-
-            if viewModel.isDetailPanelVisible, let item = viewModel.detailItem {
-                FileDetailPanelView(item: item)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
+            .frame(minWidth: 340, idealWidth: viewModel.browserSidebarWidth, maxWidth: 520)
+            .trackPanelWidth { viewModel.saveSidebarWidth($0) }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.isDetailPanelVisible)
     }
 
     private var recentBookmarksBar: some View {

@@ -32,8 +32,6 @@ enum CleanupSuggestionService {
 
         // Xcode paths and old Downloads are handled by Smart Collections in the Browser panel.
         let knownTargets: [(String, String, URL)] = [
-            ("Caches", "App cache files", home.appendingPathComponent("Library/Caches")),
-            ("Logs", "Old log files", home.appendingPathComponent("Library/Logs")),
             ("Trash", "Trash contents", home.appendingPathComponent(".Trash")),
             ("npm cache", "Node package cache", home.appendingPathComponent(".npm")),
             ("yarn cache", "Yarn cache", home.appendingPathComponent("Library/Caches/Yarn")),
@@ -65,6 +63,10 @@ enum CleanupSuggestionService {
 
         tasks.append(("Cache subdirs", {
             await scanLargeCacheSubdirs(in: home.appendingPathComponent("Library/Caches"))
+        }))
+
+        tasks.append(("Log subdirs", {
+            await scanLargeCacheSubdirs(in: home.appendingPathComponent("Library/Logs"))
         }))
 
         if PathUtils.isWithinVolume(home, scanRoot: volumeRoot) || volumeRoot.path == "/" {

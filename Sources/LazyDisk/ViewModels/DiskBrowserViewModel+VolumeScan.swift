@@ -73,9 +73,12 @@ extension DiskBrowserViewModel {
 
     func rescanVolume() {
         guard let volume = selectedVolume else { return }
-        appPhase = .scanning
+        let previousPath = currentPath ?? volume.scanRoot
+
         scanTask?.cancel()
         prefetchTask?.cancel()
+        isLoading = true
+        scanProgress = L10n.scanPreparing
         scanTask = Task {
             await cache.clear()
             await scanner.clearSizeCache()
@@ -89,11 +92,26 @@ extension DiskBrowserViewModel {
                 trackDetailedProgress: true
             )
             guard !Task.isCancelled else { return }
+
+            let resolvedPrevious = PathUtils.resolved(previousPath)
+            let resolvedRoot = PathUtils.resolved(volume.scanRoot)
+            if resolvedPrevious.path != resolvedRoot.path,
+               PathUtils.isWithinVolume(resolvedPrevious, scanRoot: volume.scanRoot) {
+                await performScan(
+                    at: resolvedPrevious,
+                    volume: volume,
+                    isVolumeRoot: false,
+                    trackDetailedProgress: false
+                )
+            }
+            guard !Task.isCancelled else { return }
+
             startPrefetching(from: entries)
             startSearchIndexBuild()
             saveScanSnapshot(volume: volume)
-            appPhase = .ready
             isLoading = false
+            scanProgress = ""
+            scanProgressFraction = 1
             applyPendingExternalAnalyzeIfNeeded()
         }
     }

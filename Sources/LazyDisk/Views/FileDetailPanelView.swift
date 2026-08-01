@@ -9,42 +9,17 @@ struct FileDetailPanelView: View {
     @State private var loadedPath: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider().opacity(0.4)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    iconSection
-                    statsSection
-                    pathSection
-                    actionsSection
-                }
-                .padding(16)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                iconSection
+                statsSection
+                pathSection
+                actionsSection
             }
+            .padding(16)
         }
-        .frame(minWidth: 260, idealWidth: 280, maxWidth: 320)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
         .onAppear { loadMetadata() }
         .onChange(of: item.id) { _ in loadMetadata() }
-    }
-
-    private var header: some View {
-        HStack {
-            Text(L10n.detailTitle)
-                .font(.system(size: 12, weight: .bold))
-            Spacer()
-            Button {
-                viewModel.isDetailPanelVisible = false
-                viewModel.detailItem = nil
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-            .help(L10n.cancel)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
     }
 
     private var iconSection: some View {

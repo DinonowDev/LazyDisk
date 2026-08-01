@@ -69,7 +69,7 @@ enum DeleteWarningService {
 
     static func summaryMessage(for warnings: [DeleteWarning], itemCount: Int, totalSize: Int64) -> String {
         let size = ByteFormatter.string(from: totalSize)
-        var message = L10n.deleteSummaryMove(count: itemCount, size: size)
+        var message = L10n.deleteSummary(count: itemCount, size: size)
 
         if !warnings.isEmpty {
             message += "\n\n"

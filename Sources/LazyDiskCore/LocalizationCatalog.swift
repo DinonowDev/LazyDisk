@@ -8,13 +8,14 @@ public enum StringKey: String, CaseIterable {
     case noSearchResults, sortSizeDesc, sortSizeAsc, sortNameAsc, sortNameDesc, sortDateDesc, sortDateAsc, sortKind
     case langSystem, purgeableSpace, iCloudPlaceholder, snapshotsReserved
     case storageBreakdown, storageUsed, storageFree, deleteTitle, deleteSafeMessage, deleteItemsHeader
-    case cancel, moveToTrash, hintSpace, hintEnter, hintBackspace, hintShiftSelect
+    case cancel, deleteAction, hintSpace, hintEnter, hintBackspace, hintShiftSelect
     case preferences, prefGeneral, prefCache, prefHidden, prefLanguage, prefScanParallel, prefScanParallelHelp
     case searchScopeFolder, searchScopeVolume, searchIndexing, searchSearching, searchResults, searchNoResults
     case searchIndexReady, searchGoToFolder, searchEngineSpotlight, searchEngineIndex, searchEngineLive, rebuildSearchIndex
     case columnModified, columnKind, columnSize, columnName, scanFromCache, scanLive
     case panelBrowser, panelCleanup, panelDuplicates, panelHistory, panelDev, panelGoal
-    case cleanupTitle, cleanupEmpty, cleanupAddAll, cleanupScan
+    case cleanupTitle, cleanupEmpty, cleanupEmptyDesc, cleanupAddAll, cleanupScan, cleanupSortScore
+    case cleanupBreakdown, cleanupCategoryCount, cleanupSummarySubtitle
     case dupTitle, dupScan, dupEmpty, dupKeep, dupDelete
     case historyTitle, historyEmpty, historyDiff, historyGrowth, historySaved
     case historyEmptyDesc, historySnapshotsCount, historyCompareCurrent, historyComparePrevious
@@ -66,7 +67,7 @@ public enum StringKey: String, CaseIterable {
     case permFullDiskTitle, permFullDiskDesc, permUserFilesTitle, permUserFilesDesc
     case permRemovableTitle, permRemovableDesc, permCleanupTitle, permCleanupDesc
     case dupPhaseCollect, dupPhaseHash, historyAdded, historyRemoved, historyChanged
-    case menuBarTotal, menuBarPercent, errorDeleteFailed, errorCannotDelete, suggestionsCount, scanProgressFmt
+    case menuBarTotal, menuBarPercent, errorDeleteFailed, errorCannotDelete, errorCannotDeleteLibraryContainer, suggestionsCount, scanProgressFmt
     case scanningDiskTitle, scanPreparing, scanReadingList, scanFoundItems
     case scanFolderNamed, scanFoldersProgress, scanFinalizing, scanCaching, scanCachingFolders
     case percentFmt, progressStepFmt
@@ -78,7 +79,7 @@ public enum StringKey: String, CaseIterable {
     case warnIOSBackupTitle, warnIOSBackupMsg, warnTimeMachineTitle, warnTimeMachineMsg
     case warnSystemTitle, warnSystemMsg, warnRunningAppTitle, warnRunningAppMsg
     case warnLibraryTitle, warnLibraryMsg, warnBulkDeleteTitle, warnBulkDeleteMsg
-    case deleteSummaryMoveOne, deleteSummaryMoveMany
+    case deleteSummaryOne, deleteSummaryMany
     // Chart styles
     case chartStyleRose, chartStyleSunburst, chartStyleTreemap, chartUsedLabel, chartHintDrillDown, prefChartStyle
     // Smart collections
@@ -150,11 +151,11 @@ public struct LocalizationCatalog {
         .storageBreakdown: ml(en: "Storage", fa: "فضا", zh: "存储", fr: "Stockage", ar: "التخزين", tr: "Depolama"),
         .storageUsed: ml(en: "Used", fa: "استفاده", zh: "已用", fr: "Utilisé", ar: "مستخدم", tr: "Kullanılan"),
         .storageFree: ml(en: "Free", fa: "آزاد", zh: "可用", fr: "Libre", ar: "حر", tr: "Boş"),
-        .deleteTitle: ml(en: "Move to Trash?", fa: "انتقال به سطل؟", zh: "移到废纸篓？", fr: "Mettre à la corbeille ?", ar: "نقل للسلة؟", tr: "Çöpe taşınsın mı?"),
-        .deleteSafeMessage: ml(en: "Items can be restored from Trash.", fa: "قابل بازیابی از سطل زباله.", zh: "可从废纸篓恢复。", fr: "Récupérable depuis la corbeille.", ar: "يمكن الاستعادة من السلة.", tr: "Çöpten geri alınabilir."),
+        .deleteTitle: ml(en: "Delete permanently?", fa: "حذف دائمی؟", zh: "永久删除？", fr: "Supprimer définitivement ?", ar: "حذف نهائي؟", tr: "Kalıcı olarak silinsin mi?"),
+        .deleteSafeMessage: ml(en: "This action cannot be undone.", fa: "این عمل قابل بازگشت نیست.", zh: "此操作无法撤销。", fr: "Cette action est irréversible.", ar: "لا يمكن التراجع عن هذا الإجراء.", tr: "Bu işlem geri alınamaz."),
         .deleteItemsHeader: ml(en: "Items", fa: "آیتم‌ها", zh: "项目", fr: "Éléments", ar: "عناصر", tr: "Öğeler"),
         .cancel: ml(en: "Cancel", fa: "لغو", zh: "取消", fr: "Annuler", ar: "إلغاء", tr: "İptal"),
-        .moveToTrash: ml(en: "Move to Trash", fa: "انتقال به سطل", zh: "移到废纸篓", fr: "Corbeille", ar: "نقل للسلة", tr: "Çöpe taşı"),
+        .deleteAction: ml(en: "Delete", fa: "حذف", zh: "删除", fr: "Supprimer", ar: "حذف", tr: "Sil"),
         .hintSpace: ml(en: "Space — Preview", fa: "Space — پیش‌نمایش", zh: "空格 — 预览", fr: "Espace — Aperçu", ar: "مسافة — معاينة", tr: "Space — Önizleme"),
         .hintEnter: ml(en: "↵ Open", fa: "↵ باز کردن", zh: "↵ 打开", fr: "↵ Ouvrir", ar: "↵ فتح", tr: "↵ Aç"),
         .hintBackspace: ml(en: "⌫ Up", fa: "⌫ برگشت", zh: "⌫ 返回", fr: "⌫ Retour", ar: "⌫ رجوع", tr: "⌫ Yukarı"),
@@ -192,8 +193,13 @@ public struct LocalizationCatalog {
         .panelGoal: ml(en: "Free Space", fa: "هدف فضا", zh: "释放空间", fr: "Espace libre", ar: "مساحة حرة", tr: "Boş alan"),
         .cleanupTitle: ml(en: "Smart Cleanup", fa: "پاکسازی هوشمند", zh: "智能清理", fr: "Nettoyage intelligent", ar: "تنظيف ذكي", tr: "Akıllı temizlik"),
         .cleanupEmpty: ml(en: "No suggestions yet", fa: "پیشنهادی نیست", zh: "暂无建议", fr: "Aucune suggestion", ar: "لا اقتراحات", tr: "Öneri yok"),
+        .cleanupEmptyDesc: ml(en: "Scan caches, installers, and aging files to find space you can reclaim safely.", fa: "کش‌ها، نصب‌کننده‌ها و فایل‌های قدیمی را اسکن کنید تا فضای قابل بازیابی پیدا شود.", zh: "扫描缓存、安装包和旧文件，找出可安全释放的空间。", fr: "Analysez caches, installateurs et anciens fichiers pour libérer de l'espace.", ar: "افحص الذاكرة المؤقتة وملفات التثبيت والملفات القديمة لاسترداد المساحة.", tr: "Önbellekleri, yükleyicileri ve eski dosyaları tarayarak alan kazanın."),
         .cleanupAddAll: ml(en: "Add all to Collector", fa: "همه به سطل", zh: "全部添加", fr: "Tout ajouter", ar: "إضافة الكل", tr: "Tümünü ekle"),
         .cleanupScan: ml(en: "Scan suggestions", fa: "اسکن پیشنهادها", zh: "扫描建议", fr: "Analyser", ar: "فحص", tr: "Tara"),
+        .cleanupSortScore: ml(en: "Priority", fa: "اولویت", zh: "优先级", fr: "Priorité", ar: "الأولوية", tr: "Öncelik"),
+        .cleanupBreakdown: ml(en: "By category", fa: "بر اساس دسته", zh: "按类别", fr: "Par catégorie", ar: "حسب الفئة", tr: "Kategoriye göre"),
+        .cleanupCategoryCount: ml(en: "%d items", fa: "%d مورد", zh: "%d 项", fr: "%d éléments", ar: "%d عناصر", tr: "%d öğe"),
+        .cleanupSummarySubtitle: ml(en: "%d items · %@ reclaimable", fa: "%d مورد · %@ قابل بازیابی", zh: "%d 项 · 可释放 %@", fr: "%d éléments · %@ récupérables", ar: "%d عناصر · %@ قابلة للاسترداد", tr: "%d öğe · %@ kazanılabilir"),
         .dupTitle: ml(en: "Duplicate Files", fa: "فایل‌های تکراری", zh: "重复文件", fr: "Doublons", ar: "ملفات مكررة", tr: "Yinelenen dosyalar"),
         .dupScan: ml(en: "Find duplicates", fa: "یافتن تکراری", zh: "查找重复", fr: "Trouver", ar: "بحث", tr: "Bul"),
         .dupEmpty: ml(en: "No duplicates found", fa: "تکراری نیست", zh: "无重复", fr: "Aucun doublon", ar: "لا مكررات", tr: "Kopya yok"),
@@ -425,7 +431,7 @@ public struct LocalizationCatalog {
         .permRemovableTitle: ml(en: "Removable Volumes", fa: "دیسک‌های خارجی", zh: "可移动卷", fr: "Volumes amovibles", ar: "أقراص قابلة للإزالة", tr: "Çıkarılabilir birimler"),
         .permRemovableDesc: ml(en: "Analyze external drives and USB volumes", fa: "تحلیل درایوهای USB", zh: "分析外部驱动器", fr: "Analyser disques externes", ar: "تحليل الأقراص الخارجية", tr: "Harici sürücüleri analiz et"),
         .permCleanupTitle: ml(en: "Trash & Cleanup", fa: "سطل و پاکسازی", zh: "废纸篓和清理", fr: "Corbeille et nettoyage", ar: "السلة والتنظيف", tr: "Çöp ve temizlik"),
-        .permCleanupDesc: ml(en: "Move files and folders to Trash safely", fa: "انتقال امن به سطل زباله", zh: "安全移到废纸篓", fr: "Déplacer vers la corbeille", ar: "نقل للسلة بأمان", tr: "Güvenle çöpe taşı"),
+        .permCleanupDesc: ml(en: "Delete files and folders permanently", fa: "حذف دائمی فایل‌ها و پوشه‌ها", zh: "永久删除文件和文件夹", fr: "Supprimer définitivement fichiers et dossiers", ar: "حذف الملفات والمجلدات نهائياً", tr: "Dosya ve klasörleri kalıcı olarak sil"),
         .dupPhaseCollect: ml(en: "Collecting files…", fa: "جمع‌آوری فایل‌ها…", zh: "收集文件…", fr: "Collecte…", ar: "جمع الملفات…", tr: "Dosyalar toplanıyor…"),
         .dupPhaseHash: ml(en: "Hashing candidates…", fa: "هش کردن…", zh: "哈希候选…", fr: "Hachage…", ar: "تجزئة…", tr: "Hashleniyor…"),
         .historyAdded: ml(en: "Added", fa: "اضافه شده", zh: "新增", fr: "Ajouté", ar: "مضاف", tr: "Eklenen"),
@@ -433,8 +439,9 @@ public struct LocalizationCatalog {
         .historyChanged: ml(en: "Changed", fa: "تغییر یافته", zh: "已更改", fr: "Modifié", ar: "متغير", tr: "Değişen"),
         .menuBarTotal: ml(en: "Total", fa: "کل", zh: "总计", fr: "Total", ar: "الإجمالي", tr: "Toplam"),
         .menuBarPercent: ml(en: "%d%% used", fa: "%d%% استفاده", zh: "已用 %d%%", fr: "%d%% utilisé", ar: "%d%% مستخدم", tr: "%d%% kullanılan"),
-        .errorDeleteFailed: ml(en: "Failed to move to Trash: %@", fa: "انتقال به سطل ناموفق: %@", zh: "移到废纸篓失败: %@", fr: "Échec corbeille : %@", ar: "فشل النقل: %@", tr: "Çöpe taşınamadı: %@"),
+        .errorDeleteFailed: ml(en: "Failed to delete: %@", fa: "حذف ناموفق: %@", zh: "删除失败: %@", fr: "Échec suppression : %@", ar: "فشل الحذف: %@", tr: "Silinemedi: %@"),
         .errorCannotDelete: ml(en: "Cannot delete system-protected or virtual items.", fa: "حذف آیتم‌های محافظت‌شده ممکن نیست.", zh: "无法删除受保护项。", fr: "Suppression impossible.", ar: "لا يمكن الحذف.", tr: "Korumalı öğeler silinemez."),
+        .errorCannotDeleteLibraryContainer: ml(en: "The Caches or Logs folder cannot be deleted as a whole. Select individual items inside it instead.", fa: "پوشه Caches یا Logs را نمی‌توان یکجا حذف کرد. آیتم‌های داخل آن را جداگانه انتخاب کنید.", zh: "无法整体删除 Caches 或 Logs 文件夹。请改为选择其中的单个项目。", fr: "Le dossier Caches ou Logs ne peut pas être supprimé en entier. Sélectionnez les éléments qu'il contient.", ar: "لا يمكن حذف مجلد Caches أو Logs بالكامل. اختر العناصر داخله بدلاً من ذلك.", tr: "Caches veya Logs klasörü bir bütün olarak silinemez. Bunun yerine içindeki öğeleri seçin."),
         .suggestionsCount: ml(en: "%d suggestions", fa: "%d پیشنهاد", zh: "%d 条建议", fr: "%d suggestions", ar: "%d اقتراح", tr: "%d öneri"),
         .scanProgressFmt: ml(en: "%d / %d", fa: "%d / %d", zh: "%d / %d", fr: "%d / %d", ar: "%d / %d", tr: "%d / %d"),
         .scanningDiskTitle: ml(en: "Scanning Disk", fa: "در حال اسکن دیسک", zh: "正在扫描磁盘", fr: "Analyse du disque", ar: "فحص القرص", tr: "Disk taranıyor"),
@@ -478,8 +485,8 @@ public struct LocalizationCatalog {
         .warnLibraryMsg: ml(en: "These Library folders may contain mail, keychain data, or app settings.", fa: "این فولدرهای Library ممکن است شامل ایمیل، keychain یا تنظیمات برنامه باشند.", zh: "这些 Library 文件夹可能包含邮件、钥匙串或应用设置。", fr: "Ces dossiers Library peuvent contenir mail, trousseau ou réglages.", ar: "قد تحتوي على بريد أو keychain أو إعدادات.", tr: "Mail, anahtar zinciri veya uygulama ayarları içerebilir."),
         .warnBulkDeleteTitle: ml(en: "Bulk Delete", fa: "حذف گروهی", zh: "批量删除", fr: "Suppression groupée", ar: "حذف جماعي", tr: "Toplu silme"),
         .warnBulkDeleteMsg: ml(en: "You are about to delete %d items. Review carefully before confirming.", fa: "در حال حذف %d آیتم هستید. قبل از تأیید با دقت بررسی کنید.", zh: "即将删除 %d 个项目。请仔细确认。", fr: "Vous allez supprimer %d éléments. Vérifiez avant de confirmer.", ar: "أنت على وشك حذف %d عنصر. راجع بعناية.", tr: "%d öğe silinecek. Onaylamadan önce kontrol edin."),
-        .deleteSummaryMoveOne: ml(en: "Move 1 item (%@) to Trash?", fa: "۱ آیتم (%@) به سطل زباله منتقل شود؟", zh: "将 1 个项目 (%@) 移到废纸篓？", fr: "Déplacer 1 élément (%@) vers la corbeille ?", ar: "نقل عنصر واحد (%@) إلى السلة؟", tr: "1 öğe (%@) çöpe taşınsın mı?"),
-        .deleteSummaryMoveMany: ml(en: "Move %d items (%@) to Trash?", fa: "%d آیتم (%@) به سطل زباله منتقل شود؟", zh: "将 %d 个项目 (%@) 移到废纸篓？", fr: "Déplacer %d éléments (%@) vers la corbeille ?", ar: "نقل %d عنصر (%@) إلى السلة؟", tr: "%d öğe (%@) çöpe taşınsın mı?"),
+        .deleteSummaryOne: ml(en: "Delete 1 item (%@) permanently?", fa: "۱ آیتم (%@) برای همیشه حذف شود؟", zh: "永久删除 1 个项目 (%@)？", fr: "Supprimer définitivement 1 élément (%@) ?", ar: "حذف عنصر واحد (%@) نهائياً؟", tr: "1 öğe (%@) kalıcı olarak silinsin mi?"),
+        .deleteSummaryMany: ml(en: "Delete %d items (%@) permanently?", fa: "%d آیتم (%@) برای همیشه حذف شوند؟", zh: "永久删除 %d 个项目 (%@)？", fr: "Supprimer définitivement %d éléments (%@) ?", ar: "حذف %d عنصر (%@) نهائياً؟", tr: "%d öğe (%@) kalıcı olarak silinsin mi?"),
         .chartStyleRose: ml(en: "Rose", fa: "گل‌رز", zh: "玫瑰图", fr: "Rose", ar: "وردي", tr: "Gül"),
         .chartStyleSunburst: ml(en: "Sunburst", fa: "خورشیدی", zh: "旭日图", fr: "Sunburst", ar: "شمسي", tr: "Sunburst"),
         .chartStyleTreemap: ml(en: "Treemap", fa: "نقشه درختی", zh: "树状图", fr: "Treemap", ar: "خريطة شجرية", tr: "Treemap"),

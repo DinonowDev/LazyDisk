@@ -118,7 +118,7 @@ struct LazyDiskApp: App {
                 }
                 .keyboardShortcut("a", modifiers: .command)
 
-                Button(L10n.moveToTrash) {
+                Button(L10n.deleteAction) {
                     viewModel.requestDelete()
                 }
                 .keyboardShortcut(.delete, modifiers: .command)

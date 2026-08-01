@@ -27,10 +27,10 @@ extension FolderSidebarView {
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    Text(L10n.panelBrowser)
+                    Text(viewModel.isDetailPanelVisible ? L10n.detailTitle : L10n.panelBrowser)
                         .font(.system(size: 12, weight: .bold))
                         .lineLimit(1)
-                    if viewModel.loadedFromCache {
+                    if viewModel.loadedFromCache && !viewModel.isDetailPanelVisible {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 8))
                             .foregroundStyle(.orange)
@@ -39,7 +39,10 @@ extension FolderSidebarView {
                 }
 
                 HStack(spacing: 3) {
-                    if viewModel.isLoading {
+                    if viewModel.isDetailPanelVisible, let item = viewModel.detailItem {
+                        Text(item.displayName)
+                            .lineLimit(1)
+                    } else if viewModel.isLoading {
                         CompactProgressView(size: 10)
                         Text(viewModel.scanProgress.isEmpty ? L10n.scanLive : viewModel.scanProgress)
                     } else {
@@ -83,8 +86,16 @@ extension FolderSidebarView {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
 
-                SidebarIconButton(icon: "arrow.up", isEnabled: viewModel.breadcrumbs.count > 1, help: L10n.goUp) {
-                    viewModel.navigateUp()
+                SidebarIconButton(
+                    icon: viewModel.isDetailPanelVisible ? "chevron.left" : "arrow.up",
+                    isEnabled: viewModel.isDetailPanelVisible || viewModel.breadcrumbs.count > 1,
+                    help: viewModel.isDetailPanelVisible ? L10n.back : L10n.goUp
+                ) {
+                    if viewModel.isDetailPanelVisible {
+                        viewModel.closeDetailPanel()
+                    } else {
+                        viewModel.navigateUp()
+                    }
                 }
                 SidebarIconButton(icon: "arrow.clockwise", isEnabled: !viewModel.isLoading, help: L10n.refresh) {
                     viewModel.refreshCurrentFolder()
@@ -97,9 +108,14 @@ extension FolderSidebarView {
 
     var breadcrumbSection: some View {
         BreadcrumbView(
-            breadcrumbs: viewModel.breadcrumbs,
+            breadcrumbs: viewModel.navigationBreadcrumbs,
             volumeName: viewModel.selectedVolume?.name ?? L10n.diskLabel
         ) { url in
+            if viewModel.isDetailPanelVisible,
+               let item = viewModel.detailItem,
+               PathUtils.resolved(url).path == PathUtils.resolved(item.url).path {
+                return
+            }
             viewModel.navigate(to: url)
         }
         .padding(.horizontal, 12)

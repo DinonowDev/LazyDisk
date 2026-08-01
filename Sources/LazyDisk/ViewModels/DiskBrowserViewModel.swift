@@ -90,6 +90,7 @@ final class DiskBrowserViewModel: ObservableObject {
     // Detail panel
     @Published var detailItem: DiskItem?
     @Published var isDetailPanelVisible = false
+    @Published var browserSidebarWidth: CGFloat = AppPreferences.load().browserSidebarWidth
 
     var scanTask: Task<Void, Never>?
     var prefetchTask: Task<Void, Never>?
@@ -169,6 +170,18 @@ final class DiskBrowserViewModel: ObservableObject {
             crumbs.append(current)
         }
 
+        return crumbs
+    }
+
+    var navigationBreadcrumbs: [URL] {
+        var crumbs = breadcrumbs
+        guard isDetailPanelVisible, let item = detailItem else { return crumbs }
+
+        let itemPath = PathUtils.resolved(item.url).path
+        let lastPath = PathUtils.resolved(crumbs.last ?? item.url).path
+        if itemPath != lastPath {
+            crumbs.append(item.url)
+        }
         return crumbs
     }
 

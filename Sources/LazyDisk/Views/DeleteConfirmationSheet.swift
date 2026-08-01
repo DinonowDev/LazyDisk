@@ -122,7 +122,7 @@ struct DeleteConfirmationSheet: View {
                 viewModel.confirmDelete()
                 dismiss()
             } label: {
-                Label(L10n.moveToTrash, systemImage: "trash.fill")
+                Label(L10n.deleteAction, systemImage: "trash.fill")
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)

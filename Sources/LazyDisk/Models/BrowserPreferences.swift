@@ -99,6 +99,7 @@ struct AppPreferences: Sendable {
     var scanParallelism: Int = 6
     var searchScope: SearchScope = .entireVolume
     var freeSpaceGoalGB: Double = 10
+    var browserSidebarWidth: Double = 420
 
     static let userDefaultsKey = "LazyDisk.preferences"
 
@@ -128,6 +129,7 @@ private struct StoredPreferences: Codable {
     var scanParallelism: Int
     var searchScope: String
     var freeSpaceGoalGB: Double?
+    var browserSidebarWidth: Double?
 
     init(appPreferences: AppPreferences) {
         sortOrder = appPreferences.sortOrder.rawValue
@@ -139,6 +141,7 @@ private struct StoredPreferences: Codable {
         scanParallelism = appPreferences.scanParallelism
         searchScope = appPreferences.searchScope.rawValue
         freeSpaceGoalGB = appPreferences.freeSpaceGoalGB
+        browserSidebarWidth = appPreferences.browserSidebarWidth
     }
 
     var appPreferences: AppPreferences {
@@ -151,7 +154,8 @@ private struct StoredPreferences: Codable {
             language: AppLanguage(rawValue: language) ?? .system,
             scanParallelism: max(1, min(scanParallelism, 16)),
             searchScope: SearchScope(rawValue: searchScope) ?? .entireVolume,
-            freeSpaceGoalGB: freeSpaceGoalGB ?? 10
+            freeSpaceGoalGB: freeSpaceGoalGB ?? 10,
+            browserSidebarWidth: browserSidebarWidth ?? 420
         )
     }
 }

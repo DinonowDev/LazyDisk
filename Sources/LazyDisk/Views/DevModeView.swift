@@ -184,6 +184,16 @@ struct DevModeView: View {
 
     private var summaryCard: some View {
         HStack(alignment: .center, spacing: 16) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.accentColor, Color.accentColor.opacity(0.5)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3, height: 44)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.devReclaimable)
                     .font(.system(size: 10, weight: .semibold))
@@ -393,10 +403,14 @@ struct DevModeView: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: icon)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(ecosystemColor(items.first?.ecosystem ?? .general).opacity(0.14))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(ecosystemColor(items.first?.ecosystem ?? .general))
+                    }
 
                     VStack(alignment: .leading, spacing: 1) {
                         Text(title)

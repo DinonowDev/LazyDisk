@@ -23,4 +23,25 @@ final class DeletePathAnalyzerTests: XCTestCase {
         let url = URL(fileURLWithPath: "/Users/me/Library/Mail/V10")
         XCTAssertTrue(DeletePathAnalyzer.isSensitiveLibraryPath(url))
     }
+
+    func testDetectsLibraryContainerPaths() {
+        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
+            URL(fileURLWithPath: "/Users/me/Library/Caches")
+        ))
+        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
+            URL(fileURLWithPath: "/Users/me/Library/Logs")
+        ))
+        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
+            URL(fileURLWithPath: "/Users/me/Library")
+        ))
+        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
+            URL(fileURLWithPath: "/Library/Caches")
+        ))
+        XCTAssertFalse(DeletePathAnalyzer.isLibraryContainerPath(
+            URL(fileURLWithPath: "/Users/me/Library/Caches/Homebrew")
+        ))
+        XCTAssertFalse(DeletePathAnalyzer.isLibraryContainerPath(
+            URL(fileURLWithPath: "/Users/me/Library/Application Support")
+        ))
+    }
 }

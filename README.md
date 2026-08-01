@@ -38,7 +38,7 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 ### Cleanup & safety
 
 - **Collector** — Drag items (or ⌘D) into a staging area before deleting; shows projected free space
-- **Safe cleanup** — Move to Trash with warnings for protected paths (system, app bundles, etc.)
+- **Safe cleanup** — Permanent delete with warnings for protected paths (system, app bundles, etc.)
 - **Cleanup panel** — Suggestions for caches, logs, installers, and known junk locations
 - **Free Space Goal** — Set a target free-space amount and get ranked suggestions to reach it
 
@@ -215,7 +215,7 @@ LazyDisk opens the Browse panel and navigates to that folder (starting a volume 
 | Switch chart style | Segmented control above chart, or **Display** menu |
 | Go back | Breadcrumbs, ↑, or ⌫ |
 | Add to Collector | Drag, ⌘D, or context menu |
-| Delete | Collector or selection → Move to Trash |
+| Delete | Collector or selection → Delete permanently |
 | Global search | Toggle **Entire volume** in search bar |
 | Switch panel | Left sidebar icons (Cleanup, Duplicates, …) |
 | Export | Toolbar ⋯ menu → CSV / JSON |
