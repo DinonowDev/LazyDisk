@@ -1,0 +1,432 @@
+import SwiftUI
+
+struct ContentView: View {
+    @EnvironmentObject var viewModel: DiskBrowserViewModel
+
+    var body: some View {
+        HStack(spacing: 0) {
+            FeaturePanelSidebar(selectedPanel: $viewModel.activePanel)
+
+            VStack(spacing: 0) {
+                toolbar
+                Divider().opacity(0.5)
+
+                ZStack {
+                    browserContent
+                        .opacity(viewModel.activePanel == .browser ? 1 : 0)
+                        .allowsHitTesting(viewModel.activePanel == .browser)
+
+                    CleanupSuggestionsView()
+                        .opacity(viewModel.activePanel == .cleanup ? 1 : 0)
+                        .allowsHitTesting(viewModel.activePanel == .cleanup)
+
+                    DuplicateFinderView()
+                        .opacity(viewModel.activePanel == .duplicates ? 1 : 0)
+                        .allowsHitTesting(viewModel.activePanel == .duplicates)
+
+                    ScanDiffView()
+                        .opacity(viewModel.activePanel == .history ? 1 : 0)
+                        .allowsHitTesting(viewModel.activePanel == .history)
+
+                    DevModeView()
+                        .opacity(viewModel.activePanel == .dev ? 1 : 0)
+                        .allowsHitTesting(viewModel.activePanel == .dev)
+
+                    FreeSpaceGoalView()
+                        .opacity(viewModel.activePanel == .goal ? 1 : 0)
+                        .allowsHitTesting(viewModel.activePanel == .goal)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if viewModel.activePanel == .browser {
+                    CollectorView()
+                }
+            }
+        }
+        .background(chartBackgroundColor)
+        .keyboardShortcuts()
+        .onAppear { viewModel.refreshPermissions() }
+        .onDeleteCommand { viewModel.requestDelete() }
+        .sheet(isPresented: $viewModel.showDeleteConfirmation) {
+            DeleteConfirmationSheet()
+                .environmentObject(viewModel)
+        }
+        .alert(L10n.errorTitle, isPresented: .init(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )) {
+            Button(L10n.ok) { viewModel.errorMessage = nil }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+        .alert(L10n.exportDone, isPresented: .init(
+            get: { viewModel.exportMessage != nil },
+            set: { if !$0 { viewModel.exportMessage = nil } }
+        )) {
+            Button(L10n.ok) { viewModel.exportMessage = nil }
+        }
+    }
+
+    private var browserContent: some View {
+        HSplitView {
+            mainPanel
+                .frame(minWidth: 520)
+
+            VStack(spacing: 0) {
+                recentBookmarksBar
+                FolderSidebarView()
+            }
+            .frame(minWidth: 340, idealWidth: 420, maxWidth: 520)
+
+            if viewModel.isDetailPanelVisible, let item = viewModel.detailItem {
+                FileDetailPanelView(item: item)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isDetailPanelVisible)
+    }
+
+    private var recentBookmarksBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                if !viewModel.bookmarks.isEmpty {
+                    ForEach(viewModel.bookmarks) { bookmark in
+                        Button(bookmark.name) {
+                            viewModel.navigate(to: bookmark.url)
+                            viewModel.activePanel = .browser
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 10, weight: .medium))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.1)))
+                    }
+                }
+                ForEach(viewModel.recentFolders.prefix(5), id: \.path) { url in
+                    Button((url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent)) {
+                        viewModel.navigate(to: url)
+                        viewModel.activePanel = .browser
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.primary.opacity(0.05)))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var chartBackgroundColor: Color {
+        Color(nsColor: .windowBackgroundColor)
+    }
+
+    private var toolbar: some View {
+        HStack(spacing: 16) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "externaldrive.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("LazyDisk")
+                        .font(.system(size: 15, weight: .bold))
+                    if let volume = viewModel.selectedVolume {
+                        Text(volumeStatusText(volume))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Picker(L10n.volumeLabel, selection: volumeBinding) {
+                ForEach(viewModel.volumes) { volume in
+                    HStack {
+                        Image(systemName: volume.volumeIcon)
+                        VStack(alignment: .leading) {
+                            Text(volume.name)
+                            Text("\(volume.formattedUsed) / \(volume.formattedTotal)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tag(Optional(volume))
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 200)
+
+            Spacer()
+
+            if viewModel.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.65)
+                        .frame(width: 14, height: 14)
+                    Text(viewModel.scanProgress.isEmpty ? L10n.analyzing : viewModel.scanProgress)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.primary.opacity(0.05)))
+            }
+
+            Menu {
+                Button(L10n.exportCSV) { viewModel.exportCurrentFolderCSV() }
+                Button(L10n.exportJSON) { viewModel.exportCurrentFolderJSON() }
+                Divider()
+                Button(L10n.addBookmark) { viewModel.toggleBookmark() }
+                Button(L10n.rebuildSearchIndex) { viewModel.rebuildSearchIndex() }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+
+            Button {
+                viewModel.rescanVolume()
+            } label: {
+                Label(L10n.rescan, systemImage: "arrow.clockwise")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .disabled(viewModel.isLoading)
+
+            permissionHint
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+    }
+
+    private func volumeStatusText(_ volume: VolumeInfo) -> String {
+        "\(volume.formattedUsed) \(L10n.menuBarUsed) · \(volume.formattedAvailable) \(L10n.menuBarFree)"
+    }
+
+    private var volumeBinding: Binding<VolumeInfo?> {
+        Binding(
+            get: { viewModel.selectedVolume },
+            set: { if let vol = $0 { viewModel.selectVolume(vol) } }
+        )
+    }
+
+    private var permissionHint: some View {
+        Button {
+            viewModel.showPermissions()
+        } label: {
+            Label(
+                viewModel.allPermissionsGranted ? L10n.permissionsOK : L10n.permissions,
+                systemImage: viewModel.allPermissionsGranted ? "checkmark.shield.fill" : "lock.shield"
+            )
+            .font(.system(size: 11, weight: .medium))
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(viewModel.allPermissionsGranted ? .green : .secondary)
+    }
+
+    private var mainPanel: some View {
+        chartPanel
+            .id(viewModel.navigationAnimationID)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+    }
+
+    private var chartPanel: some View {
+        ChartPanelView(centerFolderName: centerFolderName)
+    }
+
+    private var centerFolderName: String {
+        if viewModel.isAtVolumeRoot {
+            return viewModel.selectedVolume?.name ?? L10n.diskLabel
+        }
+        guard let path = viewModel.currentPath else { return L10n.diskLabel }
+        let name = path.lastPathComponent
+        return name.isEmpty ? path.path : name
+    }
+
+    private func hintItem(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundStyle(.tertiary)
+    }
+}
+
+// MARK: - Chart Panel
+
+private struct ChartPanelView: View {
+    @EnvironmentObject var viewModel: DiskBrowserViewModel
+    let centerFolderName: String
+
+    @State private var chartHoveredID: UUID?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            DiskOverviewHeader(
+                volume: viewModel.selectedVolume,
+                currentTotal: viewModel.totalSize,
+                isLoading: viewModel.isLoading
+            )
+
+            ChartLegendView(
+                items: viewModel.chartItems,
+                totalSize: viewModel.displayTotalSize,
+                hoveredID: chartHoveredID,
+                onHover: setChartHover,
+                onSelect: { item in
+                    guard !item.isVirtual, item.isDirectory else { return }
+                    viewModel.openItem(item)
+                }
+            )
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+
+            chartStylePicker
+                .padding(.bottom, 8)
+
+            Group {
+                if viewModel.chartStyle == .sunburst {
+                    SunburstChartView(
+                        segments: viewModel.sunburstSegments,
+                        totalSize: viewModel.displayTotalSize,
+                        centerTitle: centerFolderName,
+                        centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                        hoveredID: chartHoveredID,
+                        onHover: setChartHover,
+                        onSelect: chartItemSelected,
+                        onAddToCollector: { item in
+                            viewModel.addToCollector(item)
+                        }
+                    )
+                } else if viewModel.chartStyle == .treemap {
+                    TreemapChartView(
+                        items: viewModel.chartItems,
+                        totalSize: viewModel.displayTotalSize,
+                        hoveredID: chartHoveredID,
+                        onHover: setChartHover,
+                        onSelect: chartItemSelected,
+                        onAddToCollector: { item in
+                            viewModel.addToCollector(item)
+                        }
+                    )
+                } else {
+                    RoseChartView(
+                        items: viewModel.chartItems,
+                        totalSize: viewModel.displayTotalSize,
+                        centerTitle: centerFolderName,
+                        centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                        hoveredID: chartHoveredID,
+                        onHover: setChartHover,
+                        onSelect: chartItemSelected,
+                        onAddToCollector: { item in
+                            viewModel.addToCollector(item)
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .animation(.easeInOut(duration: 0.25), value: viewModel.chartStyle)
+
+            chartHint
+        }
+        .background { chartBackground }
+        .onAppear { viewModel.refreshSunburstChildren() }
+        .onChange(of: viewModel.chartItems.map(\.id)) { _ in
+            viewModel.refreshSunburstChildren()
+        }
+        .onChange(of: viewModel.chartStyle) { _ in
+            viewModel.refreshSunburstChildren()
+        }
+        .onChange(of: chartHoveredID) { newID in
+            guard viewModel.hoveredID != newID else { return }
+            viewModel.hoveredID = newID
+        }
+        .onChange(of: viewModel.hoveredID) { newID in
+            guard chartHoveredID != newID else { return }
+            chartHoveredID = newID
+        }
+    }
+
+    private func setChartHover(_ id: UUID?) {
+        guard chartHoveredID != id else { return }
+        chartHoveredID = id
+    }
+
+    private func chartItemSelected(_ item: DiskItem) {
+        guard !item.isVirtual else { return }
+        if item.isDirectory {
+            viewModel.openItem(item)
+        } else {
+            viewModel.selectItemForDetail(item)
+        }
+    }
+
+    private var chartStylePicker: some View {
+        ChartStylePicker(selection: Binding(
+            get: { viewModel.chartStyle },
+            set: { viewModel.setChartStyle($0) }
+        ))
+        .padding(.horizontal, 20)
+    }
+
+    private var chartBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .controlBackgroundColor),
+                    Color(nsColor: .windowBackgroundColor)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [Color.accentColor.opacity(0.04), Color.clear],
+                center: .center,
+                startRadius: 0,
+                endRadius: 400
+            )
+        }
+    }
+
+    private var chartHint: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                hintItem(icon: "hand.tap.fill", text: L10n.chartHintDrillDown)
+                hintItem(icon: "info.circle", text: L10n.chartHintSelect)
+                hintItem(icon: "arrow.down.to.line", text: L10n.addToCollector)
+                hintItem(icon: "space", text: L10n.hintSpace)
+                hintItem(icon: "delete.left.fill", text: L10n.hintBackspace)
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.bottom, 14)
+    }
+
+    private func hintItem(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundStyle(.tertiary)
+    }
+}
