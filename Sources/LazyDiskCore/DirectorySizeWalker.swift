@@ -36,14 +36,14 @@ public enum DirectorySizeWalker {
 
     public static func immediateChildSizes(
         at root: URL,
+        listedChildren: [URL]? = nil,
         configuration: Configuration = .default,
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (WalkResult) -> Void)? = nil
     ) -> WalkResult {
         let normalizedRoot = PathUtils.resolved(root)
-        let rootPath = directoryPath(normalizedRoot)
-        let prefix = rootPath + "/"
-        let prefixLength = prefix.count
+        let childURLs = listedChildren ?? discoverChildren(at: normalizedRoot)
+        let matcher = ChildPathMatcher(root: normalizedRoot, children: childURLs)
 
         var childSizes: [String: Int64] = [:]
         var total: Int64 = 0
@@ -87,18 +87,9 @@ public enum DirectorySizeWalker {
                 total += allocated
                 filesScanned += 1
 
-                let filePath = PathUtils.resolved(fileURL).path
-                guard filePath.hasPrefix(prefix) else { return }
-
-                let relativeStart = filePath.index(filePath.startIndex, offsetBy: prefixLength)
-                guard relativeStart < filePath.endIndex else { return }
-
-                let relative = filePath[relativeStart...]
-                if let slash = relative.firstIndex(of: "/") {
-                    let childPath = String(filePath[..<slash])
-                    childSizes[childPath, default: 0] += allocated
-                } else {
-                    childSizes[filePath, default: 0] += allocated
+                let filePath = fileURL.standardizedFileURL.path
+                if let childKey = matcher.immediateChildKey(for: filePath) {
+                    childSizes[childKey, default: 0] += allocated
                 }
 
                 if tracksPartial, filesScanned % partialInterval == 0 {
@@ -150,8 +141,24 @@ public enum DirectorySizeWalker {
         }
     }
 
+    private static func discoverChildren(at root: URL) -> [URL] {
+        let keys: [URLResourceKey] = [.isDirectoryKey]
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+
+        return contents.filter { url in
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            return values?.isDirectory == true
+        }
+    }
+
     private static func directoryPath(_ url: URL) -> String {
-        var path = PathUtils.resolved(url).path
+        var path = url.standardizedFileURL.path
         if path.count > 1, path.hasSuffix("/") {
             path.removeLast()
         }

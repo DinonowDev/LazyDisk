@@ -4,13 +4,19 @@ import XCTest
 
 final class ChartScanProgressMathTests: XCTestCase {
     func testFileWalkFractionIncreasesSmoothly() {
-        let early = ChartScanProgressMath.fileWalkFraction(filesScanned: 24)
-        let mid = ChartScanProgressMath.fileWalkFraction(filesScanned: 200)
-        let late = ChartScanProgressMath.fileWalkFraction(filesScanned: 800)
+        let early = ChartScanProgressMath.fileWalkFraction(filesScanned: 100)
+        let mid = ChartScanProgressMath.fileWalkFraction(filesScanned: 10_000)
+        let late = ChartScanProgressMath.fileWalkFraction(filesScanned: 120_000)
 
         XCTAssertGreaterThan(mid, early)
         XCTAssertGreaterThan(late, mid)
-        XCTAssertLessThan(late, 1)
+        XCTAssertLessThan(late, ChartScanProgressMath.inFlightDisplayCap)
+        XCTAssertGreaterThan(late, 0.5)
+    }
+
+    func testLargeVolumeDoesNotShow99PercentEarly() {
+        let fraction = ChartScanProgressMath.metadataTreeFraction(filesScanned: 120_680)
+        XCTAssertLessThan(fraction, 0.80)
     }
 
     func testCombinedFractionUsesInFlightContribution() {
@@ -32,6 +38,7 @@ final class ChartScanProgressMathTests: XCTestCase {
         XCTAssertEqual(base, 0.5, accuracy: 0.001)
         XCTAssertGreaterThan(withInflight, base)
         XCTAssertEqual(withInflight, 0.8, accuracy: 0.001)
+        XCTAssertLessThanOrEqual(withInflight, ChartScanProgressMath.inFlightDisplayCap)
     }
 
     func testCombinedFractionDoesNotDropBelowCompletedFolders() {

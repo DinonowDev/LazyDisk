@@ -32,20 +32,26 @@ struct ChartChildrenScanOverlay: View {
                     scanProgressBar
 
                     VStack(spacing: 6) {
-                        Text(L10n.simpleChartScanRing(progress.currentDepth, progress.maxDepth))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.48))
-                            .textCase(.uppercase)
-                            .tracking(0.6)
+                        if progress.totalFolders > 1 {
+                            Text(L10n.simpleChartScanRing(progress.currentDepth, progress.maxDepth))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.48))
+                                .textCase(.uppercase)
+                                .tracking(0.6)
 
-                        Text(L10n.simpleChartScanProgress(progress.completedFolders, progress.totalFolders))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.58))
+                            Text(L10n.simpleChartScanProgress(progress.completedFolders, progress.totalFolders))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.58))
 
-                        if progress.remainingFolders > 0 {
-                            Text(L10n.simpleChartScanRemaining(progress.remainingFolders))
-                                .font(.system(size: 10))
-                                .foregroundStyle(.white.opacity(0.42))
+                            if progress.remainingFolders > 0 {
+                                Text(L10n.simpleChartScanRemaining(progress.remainingFolders))
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.white.opacity(0.42))
+                            }
+                        } else {
+                            Text(L10n.simpleChartScanning)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.58))
                         }
 
                         if progress.filesScanned > 0 {
