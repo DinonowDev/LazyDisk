@@ -31,16 +31,21 @@ extension DiskBrowserViewModel {
 
         entries = listed
         invalidateAllDerivedCaches()
-        refreshChartChildrenIfNeeded()
+        if !isVolumeRoot || !trackDetailedProgress {
+            refreshChartChildrenIfNeeded()
+        }
 
         if trackDetailedProgress {
             scanProgressFraction = 0.1
             scanProgress = L10n.scanFoundItems(listed.count)
         }
 
+        let sizingConfiguration: DirectorySizeWalker.Configuration = isVolumeRoot ? .volumeRoot : .default
+
         let scanned = await scanner.scanDirectorySizes(
             items: listed,
             parent: normalized,
+            configuration: sizingConfiguration,
             parallelism: AppPreferences.load().scanParallelism
         ) { [weak self] update in
             DispatchQueue.main.async {
@@ -73,6 +78,9 @@ extension DiskBrowserViewModel {
 
         entries = sorted
         invalidateAllDerivedCaches()
+        if isVolumeRoot && trackDetailedProgress {
+            refreshChartChildrenIfNeeded()
+        }
         await cache.set(
             normalized,
             entries: sorted,

@@ -79,4 +79,67 @@ final class DirectorySizeWalkerTests: XCTestCase {
         XCTAssertEqual(updated[0].size, walk.childSizesByPath[listedChild.path])
         XCTAssertFalse(updated[0].isScanning)
     }
+
+    func testVolumeRootConfigurationIncludesHiddenDirectories() throws {
+        let hidden = tempRoot.appendingPathComponent(".private", isDirectory: true)
+        let visible = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: visible, withIntermediateDirectories: true)
+        try Data(count: 30_000).write(to: hidden.appendingPathComponent("secret.bin"))
+        try Data(count: 10_000).write(to: visible.appendingPathComponent("prefs.plist"))
+
+        let defaultWalk = DirectorySizeWalker.immediateChildSizes(
+            at: tempRoot,
+            configuration: .default
+        )
+        let volumeWalk = DirectorySizeWalker.immediateChildSizes(
+            at: tempRoot,
+            configuration: .volumeRoot
+        )
+
+        XCTAssertEqual(defaultWalk.childSizesByPath[hidden.path] ?? 0, 0)
+        XCTAssertGreaterThan(volumeWalk.childSizesByPath[hidden.path] ?? 0, 20_000)
+        XCTAssertGreaterThan(volumeWalk.childSizesByPath[visible.path] ?? 0, 5_000)
+    }
+
+    func testPackageDirectoryIsSizedAsUnit() throws {
+        let apps = tempRoot.appendingPathComponent("Applications", isDirectory: true)
+        let bundle = apps.appendingPathComponent("LazyDisk.app", isDirectory: true)
+        let contents = bundle.appendingPathComponent("Contents/MacOS", isDirectory: true)
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        try Data(count: 40_000).write(to: contents.appendingPathComponent("LazyDisk"))
+        try Data(count: 8_000).write(to: bundle.appendingPathComponent("Contents/Info.plist"))
+
+        let result = DirectorySizeWalker.immediateChildSizes(at: tempRoot, configuration: .volumeRoot)
+
+        XCTAssertGreaterThan(result.childSizesByPath[apps.path] ?? 0, 40_000)
+    }
+
+    func testNativeScannerIsAvailableAndProducesSizes() throws {
+        XCTAssertTrue(NativeDirectoryScanner.isAvailable)
+
+        let apps = tempRoot.appendingPathComponent("Applications", isDirectory: true)
+        let users = tempRoot.appendingPathComponent("Users", isDirectory: true)
+        try FileManager.default.createDirectory(at: apps, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: users, withIntermediateDirectories: true)
+        try Data(count: 15_000).write(to: users.appendingPathComponent("data.bin"))
+        try Data(count: 9_000).write(to: apps.appendingPathComponent("app.bin"))
+
+        let result = DirectorySizeWalker.immediateChildSizes(
+            at: tempRoot,
+            configuration: .volumeRoot
+        )
+
+        XCTAssertGreaterThan(result.totalSize, 20_000)
+        XCTAssertGreaterThan(result.childSizesByPath[users.path] ?? 0, 10_000)
+        XCTAssertGreaterThan(result.childSizesByPath[apps.path] ?? 0, 5_000)
+    }
+
+    func testVolumeUsageResidualMathSubtractsPurgeable() {
+        let used: Int64 = 200_000_000_000
+        let scanned: Int64 = 110_000_000_000
+        let purgeable: Int64 = 80_000_000_000
+        let residual = used - scanned - purgeable
+        XCTAssertEqual(residual, 10_000_000_000)
+    }
 }

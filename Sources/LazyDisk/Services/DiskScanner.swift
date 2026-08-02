@@ -48,11 +48,13 @@ actor DiskScanner {
     func scanDirectorySizes(
         items: [DiskItem],
         parent: URL? = nil,
+        configuration: DirectorySizeWalker.Configuration = .default,
         parallelism: Int = 6,
         onProgress: (@Sendable (ScanProgressUpdate) -> Void)? = nil
     ) async -> [DiskItem] {
         let resolvedParent = parent.map(PathUtils.resolved(_:))
         let directoryItems = items.filter { $0.isDirectory && !$0.isVirtual }
+        let sizingConfiguration = onProgress == nil ? .fastSizing : configuration
 
         if let resolvedParent, !directoryItems.isEmpty {
             final class PartialHolder: @unchecked Sendable {
@@ -63,7 +65,7 @@ actor DiskScanner {
             let sized = await applySinglePassSizes(
                 parent: resolvedParent,
                 items: items,
-                configuration: onProgress == nil ? .fastSizing : .default,
+                configuration: sizingConfiguration,
                 onPartial: { walk in
                     partialHolder.items = DirectorySizeWalker.applyPartialSizes(to: items, walkResult: walk)
                     let latestPartial = partialHolder.items
@@ -86,35 +88,16 @@ actor DiskScanner {
                         directoriesResolved: directoriesResolved,
                         partialEntries: latestPartial
                     ))
-
-                    for (index, item) in latestPartial.enumerated()
-                        where item.isDirectory && !item.isVirtual && !item.isScanning {
-                        onProgress(ScanProgressUpdate(
-                            completed: directoriesResolved,
-                            total: max(directoryItems.count, 1),
-                            currentName: item.name,
-                            itemIndex: index,
-                            itemSize: item.size,
-                            filesScanned: walk.filesScanned,
-                            directoriesResolved: directoriesResolved,
-                            partialEntries: latestPartial
-                        ))
-                    }
                 }
             )
 
             if let onProgress {
-                var completed = 0
-                for (index, item) in sized.enumerated() where item.isDirectory && !item.isVirtual {
-                    completed += 1
-                    onProgress(ScanProgressUpdate(
-                        completed: completed,
-                        total: max(directoryItems.count, 1),
-                        currentName: item.name,
-                        itemIndex: index,
-                        itemSize: item.size
-                    ))
-                }
+                onProgress(ScanProgressUpdate(
+                    completed: directoryItems.count,
+                    total: max(directoryItems.count, 1),
+                    currentName: resolvedParent.lastPathComponent,
+                    partialEntries: sized
+                ))
             }
             return sized
         }
@@ -135,23 +118,24 @@ actor DiskScanner {
 
         var result = items
         let scannedTotal = result.reduce(Int64(0)) { $0 + $1.size }
-        let gap = volume.usedCapacity - scannedTotal
+        let purgeable = max(volume.purgeableCapacity, 0)
+        let residual = volume.usedCapacity - scannedTotal - purgeable
 
-        if gap > 50_000_000 {
+        if residual > 50_000_000 {
             result.append(DiskItem(
                 url: URL(fileURLWithPath: "/"),
-                name: L10n.snapshotsReserved,
-                size: gap,
+                name: L10n.systemUnscanned,
+                size: residual,
                 isDirectory: false,
                 isVirtual: true
             ))
         }
 
-        if volume.purgeableCapacity > 10_000_000 {
+        if purgeable > 10_000_000 {
             result.append(DiskItem(
                 url: URL(fileURLWithPath: "/"),
                 name: L10n.purgeableSpace,
-                size: volume.purgeableCapacity,
+                size: purgeable,
                 isDirectory: false,
                 isVirtual: true,
                 isPurgeable: true

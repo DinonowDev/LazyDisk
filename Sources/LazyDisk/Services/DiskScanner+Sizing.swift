@@ -78,7 +78,7 @@ extension DiskScanner {
                     completed: completed,
                     total: max(total, 1),
                     currentName: items[index].name,
-                    itemIndex: index,
+                    itemPath: PathUtils.resolved(items[index].url).path,
                     itemSize: size
                 ))
                 enqueueNext()

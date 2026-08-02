@@ -48,9 +48,7 @@ struct SunburstChartView: View {
                 } else {
                     segmentsLayer(chartSize: chartSize, center: center)
                     centerHub(chartSize: chartSize, center: center)
-                    if !isDaisyDisk {
-                        labelsLayer(chartSize: chartSize, center: center)
-                    }
+                    labelsLayer(chartSize: chartSize, center: center)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -174,15 +172,15 @@ struct SunburstChartView: View {
     }
 
     private func labelsLayer(chartSize: CGFloat, center: CGPoint) -> some View {
-        let depth0 = segments.filter { $0.depth == 0 }
-        let depth1 = segments.filter { $0.depth == 1 }
-
-        return ZStack {
-            ForEach(depth0) { segment in
-                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: 10, minSpan: 14)
+        ZStack {
+            ForEach(segments.filter { $0.depth == 0 }) { segment in
+                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: isDaisyDisk ? 11 : 10, minSpan: 12)
             }
-            ForEach(depth1) { segment in
-                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: 9, minSpan: 10)
+            ForEach(segments.filter { $0.depth == 1 }) { segment in
+                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: isDaisyDisk ? 10 : 9, minSpan: 8)
+            }
+            ForEach(segments.filter { $0.depth == 2 }) { segment in
+                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: isDaisyDisk ? 9 : 8, minSpan: 6)
             }
         }
     }
@@ -202,40 +200,62 @@ struct SunburstChartView: View {
             let innerR = chartSize * SunburstLayoutEngine.innerRadiusRatio(
                 depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
             )
-            let radius = segment.depth == 0
-                ? outerR + 22
-                : (innerR + outerR) / 2
+            let radius: CGFloat = {
+                switch segment.depth {
+                case 0:
+                    return isDaisyDisk ? outerR + 18 : outerR + 22
+                case 1:
+                    return (innerR + outerR) / 2
+                default:
+                    return innerR + (outerR - innerR) * 0.55
+                }
+            }()
             let angle = (segment.midAngle - 90) * .pi / 180
             let x = center.x + radius * cos(angle)
             let y = center.y + radius * sin(angle)
             let isHovered = effectiveHoveredID == segment.item.id
+            let showsSize = segment.depth <= 1 || segment.spanAngle > 14
 
             VStack(spacing: 1) {
                 Text(segment.item.displayName)
                     .font(.system(size: fontSize, weight: isHovered ? .bold : .semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .truncationMode(.tail)
-                    .minimumScaleFactor(0.7)
-                if segment.depth == 0 || segment.spanAngle > 16 {
+                    .minimumScaleFactor(0.65)
+                if showsSize {
                     Text(segment.item.formattedSize)
                         .font(.system(size: fontSize - 1, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isDaisyDisk ? Color.white.opacity(0.82) : Color.secondary)
                         .environment(\.layoutDirection, .leftToRight)
                 }
             }
-            .padding(.horizontal, segment.depth == 0 ? 6 : 4)
+            .padding(.horizontal, segment.depth == 0 ? 7 : 5)
             .padding(.vertical, segment.depth == 0 ? 4 : 2)
             .background {
-                if segment.depth == 0 {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.92))
-                        .shadow(color: .black.opacity(0.06), radius: 4, y: 1)
-                }
+                RoundedRectangle(cornerRadius: segment.depth == 0 ? 7 : 5, style: .continuous)
+                    .fill(labelBackground(isHovered: isHovered))
+                    .shadow(color: .black.opacity(isDaisyDisk ? 0.35 : 0.08), radius: 4, y: 1)
             }
-            .foregroundStyle(segment.depth == 0 ? Color.primary : Color.primary.opacity(0.9))
-            .opacity(effectiveHoveredID == nil || isHovered ? 1 : 0.35)
+            .foregroundStyle(labelForeground(depth: segment.depth, isHovered: isHovered))
+            .opacity(effectiveHoveredID == nil || isHovered ? 1 : 0.4)
             .position(x: x, y: y)
+            .allowsHitTesting(false)
         }
+    }
+
+    private func labelBackground(isHovered: Bool) -> Color {
+        if isDaisyDisk {
+            return Color.black.opacity(isHovered ? 0.72 : 0.58)
+        }
+        return Color(nsColor: .controlBackgroundColor).opacity(0.92)
+    }
+
+    private func labelForeground(depth: Int, isHovered: Bool) -> Color {
+        if isDaisyDisk {
+            return .white.opacity(isHovered ? 1 : 0.94)
+        }
+        return depth == 0 ? Color.primary : Color.primary.opacity(0.9)
     }
 
     private func centerHub(chartSize: CGFloat, center: CGPoint) -> some View {

@@ -41,7 +41,7 @@ extension DiskBrowserViewModel {
         }
 
         let maxDepth = chartTreeMaxDepth
-        let maxChildrenPerNode = interfaceMode == .simple ? 12 : 8
+        let maxChildrenPerNode = chartMaxChildrenPerNode
         let volumeID = selectedVolume?.id
         let rootName = root.lastPathComponent.isEmpty ? "Data" : root.lastPathComponent
         let expandedParents = chartExpandedOtherParents
@@ -73,14 +73,20 @@ extension DiskBrowserViewModel {
 
             let partialPublishGate = PartialPublishGate()
 
+            let skipHidden = await MainActor.run { [weak self] () -> Bool in
+                guard let self else { return true }
+                return !self.isAtVolumeRoot
+            }
+
             let buildResult = ChartTreeBuilder.build(
                 at: root,
                 listedEntries: listedEntries,
                 options: ChartTreeBuilder.BuildOptions(
                     maxDepth: maxDepth,
-                    skipHiddenFiles: true,
+                    skipHiddenFiles: skipHidden,
                     partialUpdateInterval: 40,
-                    expandedParents: expandedParents
+                    expandedParents: expandedParents,
+                    fileSizeThreshold: 0
                 ),
                 shouldCancel: { Task.isCancelled },
                 onPartial: { partial in
@@ -162,6 +168,8 @@ extension DiskBrowserViewModel {
         }
 
         guard !item.isVirtual else { return }
+        selectedIDs = [item.id]
+        hoveredID = item.id
         if item.isDirectory {
             openItem(item)
         } else {
@@ -174,9 +182,9 @@ extension DiskBrowserViewModel {
         chartDeferredByParent.removeAll()
     }
 
-    private var chartTreeMaxDepth: Int {
-        interfaceMode == .simple
-            ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
-            : SunburstLayoutEngine.Config.standard.maxDepth
+    private var chartTreeMaxDepth: Int { 3 }
+
+    private var chartMaxChildrenPerNode: Int {
+        SunburstLayoutEngine.Config.daisyDisk.maxChildrenPerNode
     }
 }
