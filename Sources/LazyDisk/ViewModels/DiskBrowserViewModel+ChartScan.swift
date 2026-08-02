@@ -19,7 +19,103 @@ private final class PartialPublishGate: @unchecked Sendable {
 extension DiskBrowserViewModel {
     func refreshChartChildrenIfNeeded() {
         guard chartStyle == .sunburst else { return }
+        if isAtVolumeRoot {
+            Task { await refreshVolumeRootChartFromCache() }
+            return
+        }
         refreshChartChildren()
+    }
+
+    func refreshVolumeRootChartFromCache() async {
+        guard chartStyle == .sunburst,
+              isAtVolumeRoot,
+              let scanRoot = selectedVolume?.scanRoot else { return }
+
+        let maxDepth = await highestFullyCachedScanDepth(scanRoot: scanRoot)
+        guard maxDepth >= 1 else {
+            refreshChartChildren()
+            return
+        }
+        await refreshChartFromScanCache(maxScanDepth: maxDepth)
+    }
+
+    func refreshChartFromScanCache(maxScanDepth: Int) async {
+        guard chartStyle == .sunburst,
+              isAtVolumeRoot,
+              let scanRoot = selectedVolume?.scanRoot else { return }
+
+        chartChildRefreshTask?.cancel()
+
+        let rootEntries = entries
+        let snapshot = await loadChartCacheSnapshot(
+            scanRoot: scanRoot,
+            rootEntries: rootEntries,
+            maxScanDepth: maxScanDepth
+        )
+
+        let map = CachedScanChartBuilder.childMap(
+            scanRoot: scanRoot,
+            rootEntries: rootEntries,
+            maxScanDepth: maxScanDepth,
+            maxChildrenPerNode: chartMaxChildrenPerNode,
+            cachedEntries: { url in snapshot[PathUtils.resolved(url).path] }
+        )
+
+        isChartChildrenLoading = false
+        chartChildrenScanProgress = nil
+        publishChartChildMap(map)
+    }
+
+    private func loadChartCacheSnapshot(
+        scanRoot: URL,
+        rootEntries: [DiskItem],
+        maxScanDepth: Int
+    ) async -> [String: [DiskItem]] {
+        var snapshot: [String: [DiskItem]] = [:]
+        let rootChildren = rootEntries.filter { $0.isDirectory && !$0.isVirtual }
+
+        var queue: [(url: URL, depth: Int)] = rootChildren.map { ($0.url, 1) }
+        var seen = Set<String>()
+
+        while !queue.isEmpty {
+            let (url, depth) = queue.removeFirst()
+            let path = PathUtils.resolved(url).path
+            guard seen.insert(path).inserted else { continue }
+            guard depth <= maxScanDepth else { continue }
+
+            if let cached = await cache.get(url), await cache.isComplete(cached) {
+                snapshot[path] = cached.entries
+            }
+
+            guard depth < maxScanDepth, let entries = snapshot[path] else { continue }
+
+            for child in entries where child.isDirectory && !child.isVirtual {
+                queue.append((child.url, depth + 1))
+            }
+        }
+
+        return snapshot
+    }
+
+    func highestFullyCachedScanDepth(scanRoot: URL) async -> Int {
+        for depth in (1...4).reversed() {
+            if await isScanDepthFullyCached(depth, scanRoot: scanRoot) {
+                return depth
+            }
+        }
+        return 0
+    }
+
+    func isScanDepthFullyCached(_ depth: Int, scanRoot: URL) async -> Bool {
+        let directories = await directoriesAtDepth(depth, scanRoot: scanRoot, rootEntries: entries)
+        if directories.isEmpty { return depth > 1 }
+
+        for directory in directories {
+            guard await cache.has(directory.url) else { return false }
+            guard let cached = await cache.get(directory.url),
+                  await cache.isComplete(cached) else { return false }
+        }
+        return true
     }
 
     func refreshChartChildren() {

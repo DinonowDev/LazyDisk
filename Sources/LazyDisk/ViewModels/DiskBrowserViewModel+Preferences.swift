@@ -70,7 +70,7 @@ extension DiskBrowserViewModel {
         chartStyle = resolved
         savePreferences()
         if resolved == .sunburst {
-            refreshChartChildren()
+            refreshChartChildrenIfNeeded()
         } else if !chartChildMap.isEmpty {
             clearChartChildMap()
         }

@@ -6,6 +6,7 @@ extension DiskBrowserViewModel {
     /// Prefetch depths 1–2 before the app becomes ready (volume root is depth 0).
     func prefetchInitialDepthLevels(scanRoot: URL) async {
         await prefetchDepthRange(1...2, scanRoot: scanRoot, trackProgress: true)
+        await refreshChartFromScanCache(maxScanDepth: 2)
     }
 
     /// After the first screen is ready, prefetch depths 3 then 4 in the background.
@@ -106,10 +107,17 @@ extension DiskBrowserViewModel {
                     }
                 }
             }
+
+            if !trackProgress {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    Task { await self.refreshChartFromScanCache(maxScanDepth: depth) }
+                }
+            }
         }
     }
 
-    private func directoriesAtDepth(
+    func directoriesAtDepth(
         _ depth: Int,
         scanRoot: URL,
         rootEntries: [DiskItem]
