@@ -204,31 +204,7 @@ extension DiskBrowserViewModel {
             for (index, item) in directories.enumerated() {
                 guard !Task.isCancelled else { return }
 
-                let folderURL = PathUtils.resolved(item.url)
-                if await ScanCache.shared.has(folderURL) { continue }
-
-                guard !Task.isCancelled else { return }
-
-                let scanned = await DiskScanner.shared.scanFolderContents(at: folderURL, light: true)
-                guard !Task.isCancelled else { return }
-
-                let sorted = scanned.sorted { $0.size > $1.size }
-                let cached = CachedDirectory(
-                    url: folderURL,
-                    entries: sorted,
-                    scannedAt: Date(),
-                    isVolumeRoot: false,
-                    contentLevel: .light
-                )
-                guard await ScanCache.shared.isComplete(cached) else { continue }
-
-                await ScanCache.shared.set(
-                    folderURL,
-                    entries: sorted,
-                    isVolumeRoot: false,
-                    contentLevel: .light
-                )
-                await SizeIndexCoordinator.shared.schedulePersist(for: volumeID)
+                await self?.prefetchDirectoryIfNeeded(item.url, volumeID: volumeID)
 
                 let folderName = item.name
                 let prefetchIndex = index

@@ -81,8 +81,14 @@ actor ScanCache {
         await persistent.clear()
     }
 
-    func has(_ url: URL) -> Bool {
-        store[key(for: url)] != nil
+    func has(_ url: URL) async -> Bool {
+        let cacheKey = key(for: url)
+        if store[cacheKey] != nil { return true }
+        guard AppPreferences.load().usePersistentCache,
+              await persistent.load(url) != nil else {
+            return false
+        }
+        return true
     }
 
     func isComplete(_ cached: CachedDirectory) -> Bool {

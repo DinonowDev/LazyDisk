@@ -134,6 +134,7 @@ extension FolderSidebarView {
 
     var listHeader: some View {
         FileListColumnsLayout(
+            reserveIconHeight: false,
             icon: { Color.clear },
             name: {
                 SortColumnButton(title: L10n.columnName, column: .name, alignment: .leading)
@@ -146,8 +147,9 @@ extension FolderSidebarView {
         .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(.tertiary)
         .textCase(.uppercase)
+        .controlSize(.mini)
         .padding(.horizontal, FileListColumns.horizontalInset)
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
         .background(Color.primary.opacity(0.03))
     }
 

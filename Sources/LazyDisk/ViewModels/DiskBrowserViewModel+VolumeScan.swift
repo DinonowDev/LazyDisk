@@ -30,6 +30,7 @@ extension DiskBrowserViewModel {
 
         scanTask?.cancel()
         prefetchTask?.cancel()
+        cancelDepthPrefetch()
         appPhase = .scanning
         scanProgressFraction = 0
         scanCurrentFolder = ""
@@ -55,7 +56,10 @@ extension DiskBrowserViewModel {
 
             guard !Task.isCancelled else { return }
 
-            startSmartPrefetch()
+            await prefetchInitialDepthLevels(scanRoot: volume.scanRoot)
+
+            guard !Task.isCancelled else { return }
+
             startSearchIndexBuild()
             saveScanSnapshot(volume: volume)
 
@@ -66,12 +70,14 @@ extension DiskBrowserViewModel {
             scanProgress = ""
             scanProgressFraction = 1
             applyPendingExternalAnalyzeIfNeeded()
+            startBackgroundDepthPrefetch(scanRoot: volume.scanRoot)
         }
     }
 
     func cancelScan() {
         scanTask?.cancel()
         prefetchTask?.cancel()
+        cancelDepthPrefetch()
         scanTask = nil
         isLoading = false
         scanProgress = ""
@@ -86,6 +92,7 @@ extension DiskBrowserViewModel {
 
         scanTask?.cancel()
         prefetchTask?.cancel()
+        cancelDepthPrefetch()
         isLoading = true
         scanProgress = L10n.scanPreparing
         scanTask = Task {
@@ -117,13 +124,17 @@ extension DiskBrowserViewModel {
             }
             guard !Task.isCancelled else { return }
 
-            startSmartPrefetch()
+            await prefetchInitialDepthLevels(scanRoot: volume.scanRoot)
+
+            guard !Task.isCancelled else { return }
+
             startSearchIndexBuild()
             saveScanSnapshot(volume: volume)
             isLoading = false
             scanProgress = ""
             scanProgressFraction = 1
             applyPendingExternalAnalyzeIfNeeded()
+            startBackgroundDepthPrefetch(scanRoot: volume.scanRoot)
         }
     }
 

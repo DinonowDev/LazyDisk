@@ -147,6 +147,8 @@ extension Int64 {
 }
 
 struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Trailing: View>: View {
+    var reserveIconHeight = true
+
     @ViewBuilder let icon: () -> Icon
     @ViewBuilder let name: () -> Name
     @ViewBuilder let size: () -> Size
@@ -163,8 +165,13 @@ struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Trailing: View>
     @ViewBuilder
     private func row(for tier: FileListColumns.Tier) -> some View {
         HStack(spacing: tier.spacing) {
-            icon()
-                .frame(width: tier.iconWidth, height: tier.iconWidth)
+            Group {
+                if reserveIconHeight {
+                    icon().frame(width: tier.iconWidth, height: tier.iconWidth)
+                } else {
+                    icon().frame(width: tier.iconWidth, alignment: .leading)
+                }
+            }
 
             name()
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
