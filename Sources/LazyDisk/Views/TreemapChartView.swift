@@ -1,3 +1,4 @@
+// Treemap chart view — temporarily not wired into ContentView; kept for re-enable.
 import SwiftUI
 
 struct TreemapChartView: View {

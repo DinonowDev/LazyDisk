@@ -55,19 +55,22 @@ public enum ChartTreeBuilder {
         public var partialUpdateInterval: Int
         public var expandedParents: Set<String>
         public var fileSizeThreshold: Int64?
+        public var parallelism: Int?
 
         public init(
             maxDepth: Int = defaultMaxDepth,
             skipHiddenFiles: Bool = true,
             partialUpdateInterval: Int = 40,
             expandedParents: Set<String> = [],
-            fileSizeThreshold: Int64? = nil
+            fileSizeThreshold: Int64? = nil,
+            parallelism: Int? = nil
         ) {
             self.maxDepth = max(0, maxDepth)
             self.skipHiddenFiles = skipHiddenFiles
             self.partialUpdateInterval = max(32, partialUpdateInterval)
             self.expandedParents = expandedParents
             self.fileSizeThreshold = fileSizeThreshold
+            self.parallelism = parallelism
         }
 
         public static let chartPreview = BuildOptions()
@@ -112,6 +115,18 @@ public enum ChartTreeBuilder {
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (BuildResult) -> Void)? = nil
     ) -> BuildResult {
+        if options.fileSizeThreshold == 0 {
+            if let native = buildWithNativeScanner(
+                at: root,
+                listedEntries: listedEntries,
+                options: options,
+                shouldCancel: shouldCancel,
+                onPartial: onPartial
+            ) {
+                return native
+            }
+        }
+
         let normalizedRoot = PathUtils.resolved(root)
         let rootPath = normalizedRoot.path
         let entries = listedEntries.filter { !$0.isVirtual && ($0.size > 0 || $0.isDirectory) }
@@ -119,6 +134,7 @@ public enum ChartTreeBuilder {
         let threshold = options.fileSizeThreshold
             ?? ChartLazyScanPolicy.deepScanThreshold(parentTotalSize: max(parentTotal, 1))
         let isRootExpanded = options.expandedParents.contains(rootPath)
+            || options.expandedParents.contains(root.path)
         let accumulator = ChartBuildAccumulator()
         let partialInterval = options.partialUpdateInterval
         let tracksPartial = onPartial != nil
@@ -271,7 +287,7 @@ public enum ChartTreeBuilder {
         onPartial: (@Sendable (BuildResult) -> Void)?
     ) {
         let childURL = PathUtils.resolved(child.url)
-        let childListed = discoverChildren(at: childURL)
+        let childListed = discoverChildren(at: childURL, skipHiddenFiles: options.skipHiddenFiles)
         let matcher = ChildPathMatcher(root: childURL, children: childListed)
 
         var enumerationOptions: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
@@ -431,12 +447,16 @@ public enum ChartTreeBuilder {
         )
     }
 
-    private static func discoverChildren(at root: URL) -> [URL] {
+    private static func discoverChildren(at root: URL, skipHiddenFiles: Bool) -> [URL] {
         let keys: [URLResourceKey] = [.isDirectoryKey]
+        var listOptions: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
+        if skipHiddenFiles {
+            listOptions.insert(.skipsHiddenFiles)
+        }
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: listOptions
         ) else {
             return []
         }

@@ -74,7 +74,7 @@ struct LazyDiskApp: App {
                     get: { viewModel.chartStyle },
                     set: { viewModel.setChartStyle($0) }
                 )) {
-                    ForEach(ChartStyle.allCases) { style in
+                    ForEach(ChartStyle.selectableCases) { style in
                         Text(style.title).tag(style)
                     }
                 }

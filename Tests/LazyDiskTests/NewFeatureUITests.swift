@@ -1,10 +1,12 @@
 import XCTest
 import LazyDiskCore
 
-/// Regression tests for Treemap, Smart Collections, Detail Panel, and panel-integration contracts.
+/// Regression tests for Smart Collections, Detail Panel, and panel-integration contracts.
+/// Treemap tests are commented out while the chart style is disabled.
 final class NewFeatureUITests: XCTestCase {
-    // MARK: - Treemap
+    // MARK: - Treemap (temporarily disabled)
 
+    /*
     func testTreemapLayoutNestedChildren() {
         let parent = DiskItem(url: URL(fileURLWithPath: "/A"), size: 100, isDirectory: true)
         let child = DiskItem(url: URL(fileURLWithPath: "/A/child"), size: 40, isDirectory: true)
@@ -36,6 +38,7 @@ final class NewFeatureUITests: XCTestCase {
         let smallArea = smallRect.rect.width * smallRect.rect.height
         XCTAssertGreaterThan(largeArea, smallArea)
     }
+    */
 
     // MARK: - Detail panel data
 

@@ -11,8 +11,11 @@ public struct SunburstSegment: Identifiable, Equatable {
     public let startAngle: CGFloat
     public let endAngle: CGFloat
     public let spanAngle: CGFloat
+    public let innerRadiusRatio: CGFloat
+    public let outerRadiusRatio: CGFloat
 
     public var midAngle: CGFloat { startAngle + spanAngle / 2 }
+    public var midRadiusRatio: CGFloat { (innerRadiusRatio + outerRadiusRatio) / 2 }
 
     public init(
         item: DiskItem,
@@ -23,7 +26,9 @@ public struct SunburstSegment: Identifiable, Equatable {
         depth: Int,
         startAngle: CGFloat,
         endAngle: CGFloat,
-        spanAngle: CGFloat
+        spanAngle: CGFloat,
+        innerRadiusRatio: CGFloat,
+        outerRadiusRatio: CGFloat
     ) {
         self.item = item
         self.colorIndex = colorIndex
@@ -34,6 +39,8 @@ public struct SunburstSegment: Identifiable, Equatable {
         self.startAngle = startAngle
         self.endAngle = endAngle
         self.spanAngle = spanAngle
+        self.innerRadiusRatio = innerRadiusRatio
+        self.outerRadiusRatio = outerRadiusRatio
     }
 }
 
@@ -45,23 +52,29 @@ public enum SunburstLayoutEngine {
         public let maxChildrenPerNode: Int
         public let maxDepth: Int
         public let minSliceDegrees: CGFloat
+        public let minRadialRatio: CGFloat
+        public let radialGapRatio: CGFloat
 
         public static let standard = Config(
-            hubRadius: 0.24,
-            maxOuterRadius: 0.38,
+            hubRadius: 0.168,
+            maxOuterRadius: 0.46,
             gapDegrees: 1.2,
             maxChildrenPerNode: 32,
             maxDepth: 3,
-            minSliceDegrees: 0.8
+            minSliceDegrees: 0.8,
+            minRadialRatio: 0.006,
+            radialGapRatio: 0.004
         )
 
         public static let daisyDisk = Config(
-            hubRadius: 0.14,
-            maxOuterRadius: 0.38,
+            hubRadius: 0.098,
+            maxOuterRadius: 0.46,
             gapDegrees: 0.6,
             maxChildrenPerNode: 32,
             maxDepth: 3,
-            minSliceDegrees: 0.4
+            minSliceDegrees: 0.4,
+            minRadialRatio: 0.005,
+            radialGapRatio: 0.003
         )
     }
 
@@ -83,9 +96,9 @@ public enum SunburstLayoutEngine {
             depth: Int,
             startAngle: CGFloat,
             availableAngle: CGFloat,
-            inheritedHue: CGFloat?,
-            inheritedSaturation: CGFloat?,
-            inheritedBrightness: CGFloat?
+            innerRadius: CGFloat,
+            branchHue: CGFloat?,
+            branchRelativeDepth: Int
         ) {
             let visible = levelItems.filter { $0.size > 0 || $0.isScanning }
             guard !visible.isEmpty else { return }
@@ -93,37 +106,50 @@ public enum SunburstLayoutEngine {
             let levelTotal = max(visible.reduce(Int64(0)) { $0 + $1.size }, 1)
             let count = CGFloat(visible.count)
             let gaps = max(0, count - 1) * config.gapDegrees
-            let usable = max(availableAngle - gaps, 1)
+            let usableAngle = max(availableAngle - gaps, 1)
+            let radialBudget = max(config.maxOuterRadius - innerRadius, config.minRadialRatio)
             var cursor = startAngle
 
             for (index, item) in visible.enumerated() {
                 let fraction = CGFloat(item.size) / CGFloat(levelTotal)
-                var span = fraction * usable
+                var span = fraction * usableAngle
                 if item.size > 0 { span = max(span, config.minSliceDegrees) }
 
+                var radialThickness = fraction * radialBudget
+                if item.size > 0 { radialThickness = max(radialThickness, config.minRadialRatio) }
+
+                let childPath = item.isDirectory && !item.isVirtual
+                    ? childrenByParentPath[PathUtils.resolved(item.url).path]
+                    : nil
+                let hasChildren = depth < config.maxDepth
+                    && childPath.map { !$0.isEmpty } == true
+
+                if hasChildren {
+                    let remainingDepth = CGFloat(config.maxDepth - depth)
+                    let reserved = remainingDepth * (config.minRadialRatio + config.radialGapRatio)
+                    radialThickness = min(radialThickness, max(config.minRadialRatio, radialBudget - reserved))
+                }
+
+                let outerRadius = min(innerRadius + radialThickness, config.maxOuterRadius)
+
                 let hue: CGFloat
-                let saturation: CGFloat
-                let brightness: CGFloat
+                let relativeDepth: Int
                 let colorIndex: Int
 
-                if let inheritedHue, let inheritedSaturation, let inheritedBrightness {
-                    hue = inheritedHue
-                    saturation = max(0.45, inheritedSaturation - CGFloat(depth) * 0.04)
-                    let siblingSpread = visible.count > 1
-                        ? (CGFloat(index) / CGFloat(visible.count - 1) - 0.5) * 0.06
-                        : 0
-                    brightness = min(
-                        0.92,
-                        inheritedBrightness + CGFloat(depth) * 0.07 + siblingSpread
-                    )
-                    colorIndex = Int(hue * 1000) + depth * 100 + index
+                if let branchHue {
+                    hue = branchHue
+                    relativeDepth = branchRelativeDepth
+                    colorIndex = Int(hue * 1000) + relativeDepth * 100 + index
                 } else {
-                    hue = CGFloat(index) / CGFloat(max(visible.count, 1))
-                    saturation = 0.78
-                    brightness = 0.58
+                    hue = rootHue(for: index, count: visible.count)
+                    relativeDepth = 0
                     colorIndex = colorCursor
                     colorCursor += 1
                 }
+
+                let components = branchColorComponents(hue: hue, relativeDepth: relativeDepth)
+                let saturation = components.saturation
+                let brightness = components.brightness
 
                 segments.append(SunburstSegment(
                     item: item,
@@ -134,13 +160,16 @@ public enum SunburstLayoutEngine {
                     depth: depth,
                     startAngle: cursor,
                     endAngle: cursor + span,
-                    spanAngle: span
+                    spanAngle: span,
+                    innerRadiusRatio: innerRadius,
+                    outerRadiusRatio: outerRadius
                 ))
 
                 if item.isDirectory, !item.isVirtual,
                    depth < config.maxDepth,
-                   let children = childrenByParentPath[PathUtils.resolved(item.url).path],
-                   !children.isEmpty, span > 2 {
+                   let children = childPath,
+                   !children.isEmpty, span > 2,
+                   outerRadius + config.radialGapRatio < config.maxOuterRadius {
                     let sorted = children
                         .filter { $0.size > 0 || $0.isScanning }
                         .sorted { $0.size > $1.size }
@@ -150,9 +179,9 @@ public enum SunburstLayoutEngine {
                         depth: depth + 1,
                         startAngle: cursor,
                         availableAngle: span,
-                        inheritedHue: hue,
-                        inheritedSaturation: saturation,
-                        inheritedBrightness: brightness
+                        innerRadius: outerRadius + config.radialGapRatio,
+                        branchHue: hue,
+                        branchRelativeDepth: relativeDepth + 1
                     )
                 }
 
@@ -166,9 +195,9 @@ public enum SunburstLayoutEngine {
             depth: 0,
             startAngle: -90,
             availableAngle: 360,
-            inheritedHue: nil,
-            inheritedSaturation: nil,
-            inheritedBrightness: nil
+            innerRadius: config.hubRadius,
+            branchHue: nil,
+            branchRelativeDepth: 0
         )
         return segments
     }
@@ -177,16 +206,21 @@ public enum SunburstLayoutEngine {
         segments.map(\.depth).max() ?? 0
     }
 
-    public static func innerRadiusRatio(depth: Int, maxDepth: Int, config: Config = .standard) -> CGFloat {
-        let ringCount = CGFloat(max(maxDepth, 0) + 1)
-        let ringWidth = (config.maxOuterRadius - config.hubRadius) / ringCount
-        return config.hubRadius + CGFloat(depth) * ringWidth
+    /// Evenly spaced hues for top-level branches (DaisyDisk-style spectrum).
+    static func rootHue(for index: Int, count: Int) -> CGFloat {
+        let offset: CGFloat = 0.08
+        return (offset + CGFloat(index) / CGFloat(max(count, 1))).truncatingRemainder(dividingBy: 1)
     }
 
-    public static func outerRadiusRatio(depth: Int, maxDepth: Int, config: Config = .standard) -> CGFloat {
-        let inner = innerRadiusRatio(depth: depth, maxDepth: maxDepth, config: config)
-        let ringCount = CGFloat(max(maxDepth, 0) + 1)
-        let ringWidth = (config.maxOuterRadius - config.hubRadius) / ringCount
-        return inner + ringWidth
+    /// Same hue per branch; inner rings darker, outer rings lighter.
+    public static func branchColorComponents(
+        hue: CGFloat,
+        relativeDepth: Int
+    ) -> (saturation: CGFloat, brightness: CGFloat) {
+        let depth = CGFloat(relativeDepth)
+        let saturation = max(0.50, 0.86 - depth * 0.10)
+        let brightness = min(0.96, 0.44 + depth * 0.14)
+        return (saturation, brightness)
     }
+
 }

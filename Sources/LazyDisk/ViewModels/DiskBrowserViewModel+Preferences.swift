@@ -17,6 +17,17 @@ extension DiskBrowserViewModel {
         prefs.save()
     }
 
+    func handleHiddenFilesPreferenceChanged() {
+        invalidateAllDerivedCaches()
+        Task {
+            await scanner.clearSizeCache()
+            if let path = currentPath {
+                await cache.invalidate(path)
+            }
+            refreshCurrentFolder()
+        }
+    }
+
     func setInterfaceMode(_ mode: InterfaceMode) {
         interfaceMode = mode
         if mode == .simple && chartStyle == .treemap {
@@ -55,9 +66,10 @@ extension DiskBrowserViewModel {
     }
 
     func setChartStyle(_ style: ChartStyle) {
-        chartStyle = style
+        let resolved = ChartStyle.resolved(style)
+        chartStyle = resolved
         savePreferences()
-        if style == .sunburst || style == .treemap {
+        if resolved == .sunburst {
             refreshChartChildren()
         } else if !chartChildMap.isEmpty {
             clearChartChildMap()

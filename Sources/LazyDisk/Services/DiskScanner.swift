@@ -22,7 +22,11 @@ actor DiskScanner {
     ) async -> [DiskItem] {
         let normalized = PathUtils.resolved(url)
         let listed = await listDirectory(at: normalized, light: light)
-        let configuration: DirectorySizeWalker.Configuration = light ? .chartPreview : .default
+        let prefs = AppPreferences.load()
+        let configuration = prefs.sizingConfiguration(
+            partialUpdateInterval: light ? 40 : 96,
+            fast: light
+        )
 
         return await applySinglePassSizes(
             parent: normalized,
@@ -42,19 +46,25 @@ actor DiskScanner {
         if let cached = await DirectorySizeIndex.shared.size(for: key) {
             return cached
         }
-        return await childWalk(for: url).totalSize
+        let configuration = AppPreferences.load().sizingConfiguration(fast: true)
+        return await childWalk(for: url, configuration: configuration).totalSize
     }
 
     func scanDirectorySizes(
         items: [DiskItem],
         parent: URL? = nil,
-        configuration: DirectorySizeWalker.Configuration = .default,
+        configuration: DirectorySizeWalker.Configuration? = nil,
         parallelism: Int = 6,
         onProgress: (@Sendable (ScanProgressUpdate) -> Void)? = nil
     ) async -> [DiskItem] {
         let resolvedParent = parent.map(PathUtils.resolved(_:))
         let directoryItems = items.filter { $0.isDirectory && !$0.isVirtual }
-        let sizingConfiguration = onProgress == nil ? .fastSizing : configuration
+        var sizingConfiguration = configuration
+            ?? AppPreferences.load().sizingConfiguration(fast: onProgress == nil)
+        if onProgress == nil {
+            sizingConfiguration.partialUpdateInterval = DirectorySizeWalker.Configuration.fastSizing.partialUpdateInterval
+        }
+        sizingConfiguration.parallelism = parallelism
 
         if let resolvedParent, !directoryItems.isEmpty {
             final class PartialHolder: @unchecked Sendable {

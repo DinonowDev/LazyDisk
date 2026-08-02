@@ -121,8 +121,12 @@ struct PreferencesView: View {
             get: { AppPreferences.load().showHiddenFiles },
             set: { newValue in
                 var prefs = AppPreferences.load()
+                let changed = prefs.showHiddenFiles != newValue
                 prefs.showHiddenFiles = newValue
                 prefs.save()
+                if changed {
+                    viewModel.handleHiddenFilesPreferenceChanged()
+                }
             }
         )
     }

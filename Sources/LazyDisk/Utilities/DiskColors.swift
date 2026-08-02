@@ -60,7 +60,6 @@ enum DiskColors {
         hue: CGFloat,
         saturation: CGFloat,
         brightness: CGFloat,
-        depth: Int = 0,
         isHovered: Bool = false
     ) -> Color {
         let hoverBoost: CGFloat = isHovered ? 0.08 : 0

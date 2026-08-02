@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SmartCollectionsSection: View {
     @EnvironmentObject var viewModel: DiskBrowserViewModel
-    @State private var isExpanded = true
+    @State private var isExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

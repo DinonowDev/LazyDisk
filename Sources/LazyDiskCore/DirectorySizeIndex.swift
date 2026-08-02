@@ -31,6 +31,25 @@ public actor DirectorySizeIndex {
     ) async -> DirectorySizeWalker.WalkResult {
         let key = PathUtils.resolved(url).path
 
+        if let listedChildren, !listedChildren.isEmpty, inflightWalks[key] == nil {
+            let childPaths = listedChildren.map { PathUtils.resolved($0).path }
+            if let rootSize = sizesByPath[key], rootSize > 0,
+               childPaths.allSatisfy({ sizesByPath[$0] != nil }) {
+                var childSizes: [String: Int64] = [:]
+                for path in childPaths {
+                    childSizes[path] = sizesByPath[path] ?? 0
+                }
+                let cached = DirectorySizeWalker.WalkResult(
+                    childSizesByPath: childSizes,
+                    totalSize: rootSize
+                )
+                if let onPartial {
+                    onPartial(cached)
+                }
+                return cached
+            }
+        }
+
         if let onPartial {
             partialObservers[key, default: []].append(onPartial)
         }

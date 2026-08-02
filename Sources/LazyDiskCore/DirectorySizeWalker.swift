@@ -17,15 +17,17 @@ public enum DirectorySizeWalker {
     public struct Configuration: Sendable {
         public var skipHiddenFiles: Bool
         public var partialUpdateInterval: Int
+        public var parallelism: Int?
 
-        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96)
-        public static let volumeRoot = Configuration(skipHiddenFiles: false, partialUpdateInterval: 96)
-        public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 40)
-        public static let fastSizing = Configuration(skipHiddenFiles: true, partialUpdateInterval: 512)
+        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96, parallelism: nil)
+        public static let volumeRoot = Configuration(skipHiddenFiles: false, partialUpdateInterval: 96, parallelism: nil)
+        public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 40, parallelism: nil)
+        public static let fastSizing = Configuration(skipHiddenFiles: true, partialUpdateInterval: 512, parallelism: nil)
 
-        public init(skipHiddenFiles: Bool, partialUpdateInterval: Int) {
+        public init(skipHiddenFiles: Bool, partialUpdateInterval: Int, parallelism: Int? = nil) {
             self.skipHiddenFiles = skipHiddenFiles
             self.partialUpdateInterval = max(32, partialUpdateInterval)
+            self.parallelism = parallelism
         }
     }
 
@@ -55,6 +57,7 @@ public enum DirectorySizeWalker {
                 listedChildren: childURLs,
                 matcher: matcher,
                 skipHiddenFiles: configuration.skipHiddenFiles,
+                parallelism: configuration.parallelism,
                 shouldCancel: shouldCancel,
                 onPartial: onPartial
             ) {

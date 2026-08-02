@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ChartStylePicker: View {
     @Binding var selection: ChartStyle
-    var styles: [ChartStyle] = ChartStyle.allCases
+    var styles: [ChartStyle] = ChartStyle.selectableCases
 
     var body: some View {
         HStack(spacing: 2) {

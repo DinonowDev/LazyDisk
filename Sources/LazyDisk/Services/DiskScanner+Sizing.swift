@@ -5,11 +5,16 @@ extension DiskScanner {
     func applySinglePassSizes(
         parent: URL,
         items: [DiskItem],
-        configuration: DirectorySizeWalker.Configuration = .default,
+        configuration: DirectorySizeWalker.Configuration? = nil,
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
     ) async -> [DiskItem] {
-        let effectiveConfiguration = onPartial == nil ? .fastSizing : configuration
+        var effectiveConfiguration = configuration
+            ?? AppPreferences.load().sizingConfiguration(fast: onPartial == nil)
+        if onPartial == nil {
+            effectiveConfiguration.partialUpdateInterval =
+                DirectorySizeWalker.Configuration.fastSizing.partialUpdateInterval
+        }
         let childURLs = items
             .filter { $0.isDirectory && !$0.isVirtual }
             .map(\.url)

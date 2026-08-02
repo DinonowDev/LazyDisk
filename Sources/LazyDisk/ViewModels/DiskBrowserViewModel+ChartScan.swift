@@ -1,4 +1,4 @@
-// DiskBrowserViewModel+ChartScan.swift — Lazy metadata tree for sunburst/treemap.
+// DiskBrowserViewModel+ChartScan.swift — Lazy metadata tree for sunburst (treemap disabled).
 import Foundation
 import LazyDiskCore
 
@@ -18,12 +18,12 @@ private final class PartialPublishGate: @unchecked Sendable {
 
 extension DiskBrowserViewModel {
     func refreshChartChildrenIfNeeded() {
-        guard chartStyle == .sunburst || chartStyle == .treemap else { return }
+        guard chartStyle == .sunburst else { return }
         refreshChartChildren()
     }
 
     func refreshChartChildren() {
-        let needsChildren = chartStyle == .sunburst || chartStyle == .treemap
+        let needsChildren = chartStyle == .sunburst
         guard needsChildren else {
             clearChartChildMap()
             isChartChildrenLoading = false
@@ -73,20 +73,18 @@ extension DiskBrowserViewModel {
 
             let partialPublishGate = PartialPublishGate()
 
-            let skipHidden = await MainActor.run { [weak self] () -> Bool in
-                guard let self else { return true }
-                return !self.isAtVolumeRoot
-            }
+            let prefs = await MainActor.run { AppPreferences.load() }
 
             let buildResult = ChartTreeBuilder.build(
                 at: root,
                 listedEntries: listedEntries,
                 options: ChartTreeBuilder.BuildOptions(
                     maxDepth: maxDepth,
-                    skipHiddenFiles: skipHidden,
+                    skipHiddenFiles: !prefs.showHiddenFiles,
                     partialUpdateInterval: 40,
                     expandedParents: expandedParents,
-                    fileSizeThreshold: 0
+                    fileSizeThreshold: 0,
+                    parallelism: prefs.scanParallelism
                 ),
                 shouldCancel: { Task.isCancelled },
                 onPartial: { partial in

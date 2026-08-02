@@ -8,7 +8,6 @@ enum NativeDirectoryScanner {
     private final class ScanBridge: @unchecked Sendable {
         let childEntries: ContiguousArray<ldfs_child_entry>
         let childPaths: [String]
-        private let prefixPointerArrays: [ContiguousArray<UnsafePointer<CChar>?>]
         private let allocations: [UnsafeMutablePointer<CChar>]
 
         init(matcher: ChildPathMatcher) {
@@ -48,7 +47,6 @@ enum NativeDirectoryScanner {
 
             childEntries = ContiguousArray(builtEntries)
             childPaths = paths
-            prefixPointerArrays = pointerArrays
             allocations = allocs
         }
 
@@ -81,6 +79,37 @@ enum NativeDirectoryScanner {
         }
     }
 
+    private final class ChartPartialContext: @unchecked Sendable {
+        var onPartial: (@Sendable (ChartTreeBuilder.BuildResult) -> Void)?
+
+        func snapshot(
+            statsPtr: UnsafePointer<ldfs_path_stat>?,
+            statsCount: Int,
+            total: Int64,
+            files: Int64
+        ) -> ChartTreeBuilder.BuildResult {
+            var statsByPath: [String: ChartTreeBuilder.NodeStats] = [:]
+            if let statsPtr, statsCount > 0 {
+                for index in 0..<statsCount {
+                    let entry = statsPtr[index]
+                    guard let pathCString = entry.path else { continue }
+                    let path = String(cString: pathCString)
+                    statsByPath[path] = ChartTreeBuilder.NodeStats(
+                        size: entry.size,
+                        directFileCount: Int(entry.file_count),
+                        isDirectory: entry.is_directory != 0
+                    )
+                }
+            }
+            return ChartTreeBuilder.BuildResult(
+                statsByPath: statsByPath,
+                totalSize: total,
+                filesScanned: Int(files),
+                deferredByParent: [:]
+            )
+        }
+    }
+
     private final class CancelBridge: @unchecked Sendable {
         let shouldCancel: (@Sendable () -> Bool)?
 
@@ -89,11 +118,16 @@ enum NativeDirectoryScanner {
         }
     }
 
+    private static func resolvedParallelism(_ parallelism: Int?) -> Int {
+        parallelism ?? ProcessInfo.processInfo.activeProcessorCount
+    }
+
     static func immediateChildSizes(
         at root: URL,
         listedChildren: [URL],
         matcher: ChildPathMatcher,
         skipHiddenFiles: Bool,
+        parallelism: Int? = nil,
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
     ) -> DirectorySizeWalker.WalkResult? {
@@ -104,6 +138,7 @@ enum NativeDirectoryScanner {
         let childCount = bridge.childEntries.count
         guard childCount > 0 else { return nil }
 
+        let runtime = NativeScanRuntime.settings(parallelism: resolvedParallelism(parallelism))
         var childSizes = [Int64](repeating: 0, count: childCount)
         var totalSize: Int64 = 0
         var filesScanned: Int64 = 0
@@ -134,7 +169,9 @@ enum NativeDirectoryScanner {
                 children: bridge.childEntries.withUnsafeBufferPointer { $0.baseAddress },
                 child_count: childCount,
                 skip_hidden: skipHiddenFiles,
-                worker_count: 5,
+                worker_count: Int32(runtime.workerCount),
+                buffer_size: runtime.bufferSize,
+                turbo: runtime.turbo,
                 should_cancel: cancelFn,
                 cancel_ctx: cancelPtr
             )
@@ -160,6 +197,148 @@ enum NativeDirectoryScanner {
             childSizesByPath: childSizesByPath,
             totalSize: totalSize,
             filesScanned: Int(filesScanned)
+        )
+    }
+
+    static func buildChartTree(
+        at root: URL,
+        listedEntries: [DiskItem],
+        maxDepth: Int,
+        skipHiddenFiles: Bool,
+        parallelism: Int? = nil,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (ChartTreeBuilder.BuildResult) -> Void)? = nil
+    ) -> ChartTreeBuilder.BuildResult? {
+        let normalizedRoot = PathUtils.resolved(root)
+        let rootPath = normalizedRoot.path
+        guard !rootPath.isEmpty else { return nil }
+
+        let directoryChildren = listedEntries
+            .filter { $0.isDirectory && !$0.isVirtual }
+            .map(\.url)
+        let matcher = ChildPathMatcher(root: normalizedRoot, children: directoryChildren)
+        let bridge = ScanBridge(matcher: matcher)
+        let childCount = bridge.childEntries.count
+
+        let runtime = NativeScanRuntime.settings(parallelism: resolvedParallelism(parallelism))
+        var childSizes = childCount > 0 ? [Int64](repeating: 0, count: childCount) : []
+        var statsPtr: UnsafeMutablePointer<ldfs_path_stat>?
+        var statsCount: Int = 0
+        var totalSize: Int64 = 0
+        var filesScanned: Int64 = 0
+
+        let cancelBridge = CancelBridge(shouldCancel: shouldCancel)
+        let cancelPtr = Unmanaged.passUnretained(cancelBridge).toOpaque()
+
+        let cancelFn: ldfs_cancel_fn = { ctx in
+            guard let ctx else { return false }
+            let bridge = Unmanaged<CancelBridge>.fromOpaque(ctx).takeUnretainedValue()
+            return bridge.shouldCancel?() ?? false
+        }
+
+        let partialContext = ChartPartialContext()
+        partialContext.onPartial = onPartial
+        let partialPtr = Unmanaged.passUnretained(partialContext).toOpaque()
+
+        let status = rootPath.withCString { rootCString in
+            var options = ldfs_tree_options(
+                root_path: rootCString,
+                max_depth: maxDepth,
+                skip_hidden: skipHiddenFiles,
+                worker_count: Int32(runtime.workerCount),
+                buffer_size: runtime.bufferSize,
+                turbo: runtime.turbo,
+                children: bridge.childEntries.withUnsafeBufferPointer { $0.baseAddress },
+                child_count: childCount,
+                should_cancel: cancelFn,
+                cancel_ctx: cancelPtr
+            )
+
+            let treeProgress: ldfs_tree_progress_fn? = onPartial == nil ? nil : { ctx, files, total, stats, count in
+                guard let ctx else { return }
+                let context = Unmanaged<ChartPartialContext>.fromOpaque(ctx).takeUnretainedValue()
+                let result = context.snapshot(
+                    statsPtr: stats,
+                    statsCount: Int(count),
+                    total: total,
+                    files: files
+                )
+                context.onPartial?(result)
+            }
+
+            if childCount > 0 {
+                return ldfs_scan_tree(
+                    &options,
+                    &childSizes,
+                    &statsPtr,
+                    &statsCount,
+                    &totalSize,
+                    &filesScanned,
+                    treeProgress,
+                    partialPtr
+                )
+            }
+            return ldfs_scan_tree(
+                &options,
+                nil,
+                &statsPtr,
+                &statsCount,
+                &totalSize,
+                &filesScanned,
+                treeProgress,
+                partialPtr
+            )
+        }
+
+        guard status == 0 else {
+            if let statsPtr, statsCount > 0 {
+                ldfs_free_path_stats(statsPtr, statsCount)
+            }
+            return nil
+        }
+
+        var statsByPath: [String: ChartTreeBuilder.NodeStats] = [:]
+        if let statsPtr, statsCount > 0 {
+            for index in 0..<statsCount {
+                let entry = statsPtr[index]
+                guard let pathCString = entry.path else { continue }
+                let path = String(cString: pathCString)
+                statsByPath[path] = ChartTreeBuilder.NodeStats(
+                    size: entry.size,
+                    directFileCount: Int(entry.file_count),
+                    isDirectory: entry.is_directory != 0
+                )
+            }
+            ldfs_free_path_stats(statsPtr, statsCount)
+        }
+
+        for entry in listedEntries where !entry.isVirtual {
+            let path = PathUtils.resolved(entry.url).path
+            if entry.isDirectory {
+                let existing = statsByPath[path] ?? ChartTreeBuilder.NodeStats(isDirectory: true)
+                if existing.size == 0 && entry.size > 0 {
+                    statsByPath[path] = ChartTreeBuilder.NodeStats(
+                        size: entry.size,
+                        directFileCount: existing.directFileCount,
+                        isDirectory: true
+                    )
+                } else if statsByPath[path] == nil {
+                    statsByPath[path] = existing
+                }
+            } else if entry.size > 0 {
+                statsByPath[path] = ChartTreeBuilder.NodeStats(
+                    size: entry.size,
+                    directFileCount: 1,
+                    isDirectory: false
+                )
+            }
+        }
+
+        return ChartTreeBuilder.BuildResult(
+            statsByPath: statsByPath,
+            totalSize: totalSize,
+            filesScanned: Int(filesScanned),
+            deferredByParent: [:]
         )
     }
 }

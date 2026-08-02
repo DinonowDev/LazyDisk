@@ -40,7 +40,8 @@ extension DiskBrowserViewModel {
             scanProgress = L10n.scanFoundItems(listed.count)
         }
 
-        let sizingConfiguration: DirectorySizeWalker.Configuration = isVolumeRoot ? .volumeRoot : .default
+        let prefs = AppPreferences.load()
+        let sizingConfiguration = prefs.sizingConfiguration()
 
         let scanned = await scanner.scanDirectorySizes(
             items: listed,

@@ -29,14 +29,6 @@ struct SunburstChartView: View {
         isPointerOverChart ? pointerHoveredID : hoveredID
     }
 
-    private var maxDepth: Int {
-        SunburstLayoutEngine.maxDepth(in: segments)
-    }
-
-    private var colorPalette: [Color] {
-        isDaisyDisk ? DiskColors.daisyDiskPalette : DiskColors.palette
-    }
-
     var body: some View {
         GeometryReader { geometry in
             let chartSize = min(geometry.size.width, geometry.size.height)
@@ -48,7 +40,7 @@ struct SunburstChartView: View {
                 } else {
                     segmentsLayer(chartSize: chartSize, center: center)
                     centerHub(chartSize: chartSize, center: center)
-                    labelsLayer(chartSize: chartSize, center: center)
+                    hoverTooltip(chartSize: chartSize, center: center)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -96,12 +88,8 @@ struct SunburstChartView: View {
     private func segmentsLayer(chartSize: CGFloat, center: CGPoint) -> some View {
         ZStack {
             ForEach(segments) { segment in
-                let innerR = chartSize * SunburstLayoutEngine.innerRadiusRatio(
-                    depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
-                )
-                let outerR = chartSize * SunburstLayoutEngine.outerRadiusRatio(
-                    depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
-                )
+                let innerR = chartSize * segment.innerRadiusRatio
+                let outerR = chartSize * segment.outerRadiusRatio
                 let isHovered = effectiveHoveredID == segment.item.id
                 let dimmed = effectiveHoveredID != nil && !isHovered
                 let animatedEnd = segment.startAngle + segment.spanAngle * animationProgress
@@ -158,108 +146,52 @@ struct SunburstChartView: View {
     }
 
     private func segmentFill(segment: SunburstSegment, isHovered: Bool) -> AnyShapeStyle {
-        if isDaisyDisk {
-            let color = DiskColors.spectrumColor(
-                hue: segment.hue,
-                saturation: segment.saturation,
-                brightness: segment.brightness,
-                depth: segment.depth,
-                isHovered: isHovered
-            )
-            return AnyShapeStyle(color)
-        }
-        return AnyShapeStyle(DiskColors.gradient(for: segment.colorIndex, depth: segment.depth, palette: colorPalette))
-    }
-
-    private func labelsLayer(chartSize: CGFloat, center: CGPoint) -> some View {
-        ZStack {
-            ForEach(segments.filter { $0.depth == 0 }) { segment in
-                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: isDaisyDisk ? 11 : 10, minSpan: 12)
-            }
-            ForEach(segments.filter { $0.depth == 1 }) { segment in
-                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: isDaisyDisk ? 10 : 9, minSpan: 8)
-            }
-            ForEach(segments.filter { $0.depth == 2 }) { segment in
-                segmentLabel(segment, chartSize: chartSize, center: center, fontSize: isDaisyDisk ? 9 : 8, minSpan: 6)
-            }
-        }
+        let color = DiskColors.spectrumColor(
+            hue: segment.hue,
+            saturation: segment.saturation,
+            brightness: segment.brightness,
+            isHovered: isHovered
+        )
+        return AnyShapeStyle(color)
     }
 
     @ViewBuilder
-    private func segmentLabel(
-        _ segment: SunburstSegment,
-        chartSize: CGFloat,
-        center: CGPoint,
-        fontSize: CGFloat,
-        minSpan: CGFloat
-    ) -> some View {
-        if segment.spanAngle > minSpan {
-            let outerR = chartSize * SunburstLayoutEngine.outerRadiusRatio(
-                depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
-            )
-            let innerR = chartSize * SunburstLayoutEngine.innerRadiusRatio(
-                depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
-            )
-            let radius: CGFloat = {
-                switch segment.depth {
-                case 0:
-                    return isDaisyDisk ? outerR + 18 : outerR + 22
-                case 1:
-                    return (innerR + outerR) / 2
-                default:
-                    return innerR + (outerR - innerR) * 0.55
-                }
-            }()
+    private func hoverTooltip(chartSize: CGFloat, center: CGPoint) -> some View {
+        if let hoveredID = effectiveHoveredID,
+           let segment = segments.first(where: { $0.item.id == hoveredID }) {
+            let radius = chartSize * segment.midRadiusRatio
             let angle = (segment.midAngle - 90) * .pi / 180
             let x = center.x + radius * cos(angle)
             let y = center.y + radius * sin(angle)
-            let isHovered = effectiveHoveredID == segment.item.id
-            let showsSize = segment.depth <= 1 || segment.spanAngle > 14
 
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text(segment.item.displayName)
-                    .font(.system(size: fontSize, weight: isHovered ? .bold : .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .truncationMode(.tail)
-                    .minimumScaleFactor(0.65)
-                if showsSize {
-                    Text(segment.item.formattedSize)
-                        .font(.system(size: fontSize - 1, weight: .medium, design: .monospaced))
-                        .foregroundStyle(isDaisyDisk ? Color.white.opacity(0.82) : Color.secondary)
-                        .environment(\.layoutDirection, .leftToRight)
-                }
+                Text(segment.item.formattedSize)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(isDaisyDisk ? Color.white.opacity(0.82) : Color.secondary)
+                    .environment(\.layoutDirection, .leftToRight)
             }
-            .padding(.horizontal, segment.depth == 0 ? 7 : 5)
-            .padding(.vertical, segment.depth == 0 ? 4 : 2)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background {
-                RoundedRectangle(cornerRadius: segment.depth == 0 ? 7 : 5, style: .continuous)
-                    .fill(labelBackground(isHovered: isHovered))
-                    .shadow(color: .black.opacity(isDaisyDisk ? 0.35 : 0.08), radius: 4, y: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isDaisyDisk ? Color.black.opacity(0.78) : Color(nsColor: .controlBackgroundColor).opacity(0.95))
+                    .shadow(color: .black.opacity(isDaisyDisk ? 0.4 : 0.12), radius: 6, y: 2)
             }
-            .foregroundStyle(labelForeground(depth: segment.depth, isHovered: isHovered))
-            .opacity(effectiveHoveredID == nil || isHovered ? 1 : 0.4)
+            .foregroundStyle(isDaisyDisk ? .white : .primary)
             .position(x: x, y: y)
             .allowsHitTesting(false)
+            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            .animation(hoverAnimation, value: hoveredID)
         }
-    }
-
-    private func labelBackground(isHovered: Bool) -> Color {
-        if isDaisyDisk {
-            return Color.black.opacity(isHovered ? 0.72 : 0.58)
-        }
-        return Color(nsColor: .controlBackgroundColor).opacity(0.92)
-    }
-
-    private func labelForeground(depth: Int, isHovered: Bool) -> Color {
-        if isDaisyDisk {
-            return .white.opacity(isHovered ? 1 : 0.94)
-        }
-        return depth == 0 ? Color.primary : Color.primary.opacity(0.9)
     }
 
     private func centerHub(chartSize: CGFloat, center: CGPoint) -> some View {
-        let hubRatio = isDaisyDisk ? layoutConfig.hubRadius * 1.1 : ChartMetrics.hubRadiusRatio * 1.85
+        let hubRatio = layoutConfig.hubRadius * (isDaisyDisk ? 1.05 : 1.08)
         let hubSize = chartSize * hubRatio
 
         return ZStack {
@@ -319,8 +251,7 @@ struct SunburstChartView: View {
     }
 
     private func isInCenterHub(at point: CGPoint, chartSize: CGFloat, center: CGPoint) -> Bool {
-        let hubRatio = layoutConfig.hubRadius * 1.1
-        let hubRadius = chartSize * hubRatio / 2
+        let hubRadius = chartSize * layoutConfig.hubRadius / 2
         let dx = point.x - center.x
         let dy = point.y - center.y
         return sqrt(dx * dx + dy * dy) <= hubRadius
@@ -333,12 +264,8 @@ struct SunburstChartView: View {
         let angle = atan2(dy, dx) * 180 / .pi
 
         for segment in segments.reversed() {
-            let innerR = chartSize * SunburstLayoutEngine.innerRadiusRatio(
-                depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
-            )
-            let outerR = chartSize * SunburstLayoutEngine.outerRadiusRatio(
-                depth: segment.depth, maxDepth: maxDepth, config: layoutConfig
-            )
+            let innerR = chartSize * segment.innerRadiusRatio
+            let outerR = chartSize * segment.outerRadiusRatio
             guard distance >= innerR - 2, distance <= outerR + 4 else { continue }
 
             let end = segment.startAngle + segment.spanAngle * animationProgress

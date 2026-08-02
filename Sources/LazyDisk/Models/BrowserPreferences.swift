@@ -1,4 +1,5 @@
 import Foundation
+import LazyDiskCore
 
 enum SortOrder: String, CaseIterable, Identifiable, Sendable {
     case sizeDescending
@@ -137,6 +138,18 @@ struct AppPreferences: Sendable {
             UserDefaults.standard.set(data, forKey: Self.userDefaultsKey)
         }
     }
+
+    /// Scan sizing that matches the hidden-files preference (used at every folder depth).
+    func sizingConfiguration(
+        partialUpdateInterval: Int = 96,
+        fast: Bool = false
+    ) -> DirectorySizeWalker.Configuration {
+        DirectorySizeWalker.Configuration(
+            skipHiddenFiles: !showHiddenFiles,
+            partialUpdateInterval: fast ? 512 : partialUpdateInterval,
+            parallelism: scanParallelism
+        )
+    }
 }
 
 private struct StoredPreferences: Codable {
@@ -170,7 +183,7 @@ private struct StoredPreferences: Codable {
         AppPreferences(
             sortOrder: SortOrder(rawValue: sortOrder) ?? .sizeDescending,
             contentFilter: ContentFilter(rawValue: contentFilter) ?? .all,
-            chartStyle: ChartStyle(rawValue: chartStyle) ?? .rose,
+            chartStyle: ChartStyle.resolved(ChartStyle(rawValue: chartStyle) ?? .rose),
             interfaceMode: InterfaceMode(rawValue: interfaceMode ?? "") ?? .professional,
             usePersistentCache: usePersistentCache,
             showHiddenFiles: showHiddenFiles,

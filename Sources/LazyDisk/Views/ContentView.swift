@@ -319,18 +319,19 @@ private struct ChartPanelView: View {
                                 viewModel.addToCollector(item)
                             }
                         )
-                    } else if viewModel.chartStyle == .treemap {
-                        TreemapChartView(
-                            items: viewModel.chartItems,
-                            childrenByParentPath: viewModel.chartChildMap,
-                            totalSize: viewModel.displayTotalSize,
-                            hoveredID: effectiveChartHover,
-                            onHover: setChartHover,
-                            onSelect: chartItemSelected,
-                            onAddToCollector: { item in
-                                viewModel.addToCollector(item)
-                            }
-                        )
+                    // Treemap temporarily disabled — re-enable with TreemapChartView when ready.
+                    // } else if viewModel.chartStyle == .treemap {
+                    //     TreemapChartView(
+                    //         items: viewModel.chartItems,
+                    //         childrenByParentPath: viewModel.chartChildMap,
+                    //         totalSize: viewModel.displayTotalSize,
+                    //         hoveredID: effectiveChartHover,
+                    //         onHover: setChartHover,
+                    //         onSelect: chartItemSelected,
+                    //         onAddToCollector: { item in
+                    //             viewModel.addToCollector(item)
+                    //         }
+                    //     )
                     } else {
                         RoseChartView(
                             items: viewModel.chartItems,

@@ -23,7 +23,7 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var searchText: String = ""
     @Published var sortOrder: SortOrder = AppPreferences.load().sortOrder
     @Published var contentFilter: ContentFilter = AppPreferences.load().contentFilter
-    @Published var chartStyle: ChartStyle = AppPreferences.load().chartStyle
+    @Published var chartStyle: ChartStyle = ChartStyle.resolved(AppPreferences.load().chartStyle)
     @Published var interfaceMode: InterfaceMode = AppPreferences.load().interfaceMode
     @Published var showPreferences = false
     @Published var showDonation = false
