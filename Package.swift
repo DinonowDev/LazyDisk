@@ -9,7 +9,16 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "LazyDiskFS",
+            path: "Sources/LazyDiskFS",
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("include"),
+            ]
+        ),
+        .target(
             name: "LazyDiskCore",
+            dependencies: ["LazyDiskFS"],
             path: "Sources/LazyDiskCore"
         ),
         .executableTarget(

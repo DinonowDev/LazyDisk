@@ -6,7 +6,7 @@ public enum StringKey: String, CaseIterable {
     case searchPlaceholder, searchPlaceholderVolume, searchFilterScope, searchFilterCollapse, filterAll, filterFolders, filterImages
     case filterVideos, filterAudio, filterDocuments, filterArchives, filterApps, filterDeveloper, filterOther
     case noSearchResults, sortSizeDesc, sortSizeAsc, sortNameAsc, sortNameDesc, sortDateDesc, sortDateAsc, sortKind
-    case langSystem, purgeableSpace, iCloudPlaceholder, snapshotsReserved
+    case langSystem, purgeableSpace, iCloudPlaceholder, snapshotsReserved, systemUnscanned
     case storageBreakdown, storageUsed, storageFree, deleteTitle, deleteSafeMessage, deleteItemsHeader
     case cancel, deleteAction, hintSpace, hintEnter, hintBackspace, hintShiftSelect
     case preferences, prefGeneral, prefCache, prefHidden, prefLanguage, prefScanParallel, prefScanParallelHelp
@@ -152,6 +152,7 @@ public struct LocalizationCatalog {
         .purgeableSpace: ml(en: "Purgeable", fa: "قابل آزادسازی", zh: "可清除", fr: "Purgeable", ar: "قابل التفريغ", tr: "Temizlenebilir"),
         .iCloudPlaceholder: ml(en: "iCloud Placeholder", fa: "فایل iCloud", zh: "iCloud占位", fr: "iCloud", ar: "iCloud", tr: "iCloud"),
         .snapshotsReserved: ml(en: "Snapshots & Reserved", fa: "اسنپ‌شات و رزرو", zh: "快照和保留", fr: "Snapshots", ar: "لقطات النظام", tr: "Anlık görüntüler"),
+        .systemUnscanned: ml(en: "System / Unscanned", fa: "سیستم / اسکن‌نشده", zh: "系统/未扫描", fr: "Système / non scanné", ar: "النظام / غير ممسوح", tr: "Sistem / taranmamış"),
         .storageBreakdown: ml(en: "Storage", fa: "فضا", zh: "存储", fr: "Stockage", ar: "التخزين", tr: "Depolama"),
         .storageUsed: ml(en: "Used", fa: "استفاده", zh: "已用", fr: "Utilisé", ar: "مستخدم", tr: "Kullanılan"),
         .storageFree: ml(en: "Free", fa: "آزاد", zh: "可用", fr: "Libre", ar: "حر", tr: "Boş"),

@@ -295,8 +295,7 @@ private struct ChartPanelView: View {
                 hoveredID: effectiveChartHover,
                 onHover: setChartHover,
                 onSelect: { item in
-                    guard !item.isVirtual, item.isDirectory else { return }
-                    viewModel.openItem(item)
+                    viewModel.handleChartItemSelection(item)
                 }
             )
             .padding(.top, 12)
@@ -310,6 +309,9 @@ private struct ChartPanelView: View {
                             totalSize: viewModel.displayTotalSize,
                             centerTitle: centerFolderName,
                             centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                            layoutConfig: viewModel.interfaceMode == .simple
+                                ? .daisyDisk
+                                : .standard,
                             hoveredID: effectiveChartHover,
                             onHover: setChartHover,
                             onSelect: chartItemSelected,

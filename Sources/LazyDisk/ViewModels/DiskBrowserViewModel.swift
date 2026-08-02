@@ -118,7 +118,7 @@ final class DiskBrowserViewModel: ObservableObject {
     var scanProgressSortTask: Task<Void, Never>?
     var scanProgressNeedsSort = false
     var hoverPublishTask: Task<Void, Never>?
-    var pendingScanUpdates: [Int: (size: Int64, isScanning: Bool)] = [:]
+    var pendingScanUpdates: [String: (size: Int64, isScanning: Bool)] = [:]
     var scanUIBatchTask: Task<Void, Never>?
     var filterCountsRevision: UInt = 0
     var chartCacheRevision: UInt = 0

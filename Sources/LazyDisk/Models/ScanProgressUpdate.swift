@@ -5,7 +5,7 @@ struct ScanProgressUpdate: Sendable {
     let completed: Int
     let total: Int
     let currentName: String
-    let itemIndex: Int?
+    let itemPath: String?
     let itemSize: Int64?
     let filesScanned: Int?
     let directoriesResolved: Int?
@@ -15,7 +15,7 @@ struct ScanProgressUpdate: Sendable {
         completed: Int,
         total: Int,
         currentName: String,
-        itemIndex: Int? = nil,
+        itemPath: String? = nil,
         itemSize: Int64? = nil,
         filesScanned: Int? = nil,
         directoriesResolved: Int? = nil,
@@ -24,7 +24,7 @@ struct ScanProgressUpdate: Sendable {
         self.completed = completed
         self.total = total
         self.currentName = currentName
-        self.itemIndex = itemIndex
+        self.itemPath = itemPath
         self.itemSize = itemSize
         self.filesScanned = filesScanned
         self.directoriesResolved = directoriesResolved

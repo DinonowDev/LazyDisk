@@ -67,6 +67,7 @@ enum L10n {
     static var purgeableSpace: String { t(.purgeableSpace) }
     static var iCloudPlaceholder: String { t(.iCloudPlaceholder) }
     static var snapshotsReserved: String { t(.snapshotsReserved) }
+    static var systemUnscanned: String { t(.systemUnscanned) }
     static var storageBreakdown: String { t(.storageBreakdown) }
     static var storageUsed: String { t(.storageUsed) }
     static var storageFree: String { t(.storageFree) }

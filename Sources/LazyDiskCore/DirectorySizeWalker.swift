@@ -19,6 +19,7 @@ public enum DirectorySizeWalker {
         public var partialUpdateInterval: Int
 
         public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96)
+        public static let volumeRoot = Configuration(skipHiddenFiles: false, partialUpdateInterval: 96)
         public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 40)
         public static let fastSizing = Configuration(skipHiddenFiles: true, partialUpdateInterval: 512)
 
@@ -42,14 +43,32 @@ public enum DirectorySizeWalker {
         onPartial: (@Sendable (WalkResult) -> Void)? = nil
     ) -> WalkResult {
         let normalizedRoot = PathUtils.resolved(root)
-        let childURLs = listedChildren ?? discoverChildren(at: normalizedRoot)
+        let childURLs = listedChildren ?? discoverChildren(
+            at: normalizedRoot,
+            skipHiddenFiles: configuration.skipHiddenFiles
+        )
         let matcher = ChildPathMatcher(root: normalizedRoot, children: childURLs)
+
+        if NativeDirectoryScanner.isAvailable {
+            if let native = NativeDirectoryScanner.immediateChildSizes(
+                at: normalizedRoot,
+                listedChildren: childURLs,
+                matcher: matcher,
+                skipHiddenFiles: configuration.skipHiddenFiles,
+                shouldCancel: shouldCancel,
+                onPartial: onPartial
+            ) {
+                if native.totalSize > 0 || native.filesScanned > 0 || childURLs.isEmpty {
+                    return native
+                }
+            }
+        }
 
         var childSizes: [String: Int64] = [:]
         var total: Int64 = 0
         var filesScanned = 0
 
-        var options: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
+        var options: FileManager.DirectoryEnumerationOptions = []
         if configuration.skipHiddenFiles {
             options.insert(.skipsHiddenFiles)
         }
@@ -141,12 +160,16 @@ public enum DirectorySizeWalker {
         }
     }
 
-    private static func discoverChildren(at root: URL) -> [URL] {
+    private static func discoverChildren(at root: URL, skipHiddenFiles: Bool) -> [URL] {
         let keys: [URLResourceKey] = [.isDirectoryKey]
+        var listOptions: FileManager.DirectoryEnumerationOptions = []
+        if skipHiddenFiles {
+            listOptions.insert(.skipsHiddenFiles)
+        }
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: listOptions
         ) else {
             return []
         }

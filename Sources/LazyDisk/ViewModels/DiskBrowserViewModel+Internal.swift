@@ -30,11 +30,18 @@ extension DiskBrowserViewModel {
                 self.scanProgress = L10n.scanFoldersProgress(update.completed, update.total)
             }
 
-            if let index = update.itemIndex, index < self.entries.count {
-                self.pendingScanUpdates[index] = (
-                    update.itemSize ?? self.entries[index].size,
-                    false
-                )
+            if let partial = update.partialEntries {
+                for item in partial where item.isDirectory && !item.isVirtual {
+                    let path = PathUtils.resolved(item.url).path
+                    self.pendingScanUpdates[path] = (item.size, item.isScanning)
+                }
+                self.scheduleScanUIBatch(generation: generation)
+            } else if let path = update.itemPath {
+                let resolved = PathUtils.resolved(URL(fileURLWithPath: path)).path
+                let size = update.itemSize ?? self.entries.first(where: {
+                    PathUtils.resolved($0.url).path == resolved
+                })?.size ?? 0
+                self.pendingScanUpdates[resolved] = (size, false)
                 self.scheduleScanUIBatch(generation: generation)
             }
         }
@@ -60,8 +67,10 @@ extension DiskBrowserViewModel {
         guard !pendingScanUpdates.isEmpty else { return }
 
         objectWillChange.send()
-        for (index, update) in pendingScanUpdates {
-            guard index < entries.count else { continue }
+        for (path, update) in pendingScanUpdates {
+            guard let index = entries.firstIndex(where: {
+                PathUtils.resolved($0.url).path == path
+            }) else { continue }
             entries[index].size = update.size
             entries[index].isScanning = update.isScanning
         }

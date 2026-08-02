@@ -50,8 +50,8 @@ public enum SunburstLayoutEngine {
             hubRadius: 0.24,
             maxOuterRadius: 0.38,
             gapDegrees: 1.2,
-            maxChildrenPerNode: 8,
-            maxDepth: 2,
+            maxChildrenPerNode: 32,
+            maxDepth: 3,
             minSliceDegrees: 0.8
         )
 
@@ -59,7 +59,7 @@ public enum SunburstLayoutEngine {
             hubRadius: 0.14,
             maxOuterRadius: 0.38,
             gapDegrees: 0.6,
-            maxChildrenPerNode: 12,
+            maxChildrenPerNode: 32,
             maxDepth: 3,
             minSliceDegrees: 0.4
         )
