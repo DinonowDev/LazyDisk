@@ -60,7 +60,7 @@ public enum SunburstLayoutEngine {
             maxOuterRadius: 0.38,
             gapDegrees: 0.6,
             maxChildrenPerNode: 12,
-            maxDepth: 4,
+            maxDepth: 3,
             minSliceDegrees: 0.4
         )
     }

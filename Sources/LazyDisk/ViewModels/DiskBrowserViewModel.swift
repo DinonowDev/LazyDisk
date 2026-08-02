@@ -102,6 +102,8 @@ final class DiskBrowserViewModel: ObservableObject {
     var scanTask: Task<Void, Never>?
     var prefetchTask: Task<Void, Never>?
     var chartChildRefreshTask: Task<Void, Never>?
+    var chartExpandedOtherParents: Set<String> = []
+    var chartDeferredByParent: [String: [URL]] = [:]
     var searchDebounceTask: Task<Void, Never>?
     var globalSearchTask: Task<Void, Never>?
     var indexBuildTask: Task<Void, Never>?

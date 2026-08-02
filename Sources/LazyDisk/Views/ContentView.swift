@@ -384,12 +384,7 @@ private struct ChartPanelView: View {
     }
 
     private func chartItemSelected(_ item: DiskItem) {
-        guard !item.isVirtual else { return }
-        if item.isDirectory {
-            viewModel.openItem(item)
-        } else {
-            viewModel.selectItemForDetail(item)
-        }
+        viewModel.handleChartItemSelection(item)
     }
 
     private var chartBackground: some View {

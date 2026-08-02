@@ -168,9 +168,6 @@ struct SimpleContentView: View {
     }
 
     private func chartItemSelected(_ item: DiskItem) {
-        guard !item.isVirtual else { return }
-        if item.isDirectory {
-            viewModel.openItem(item)
-        }
+        viewModel.handleChartItemSelection(item)
     }
 }

@@ -1,5 +1,21 @@
 import Foundation
 
+private final class ChartBuildAccumulator: @unchecked Sendable {
+    var stats: [String: ChartTreeBuilder.NodeStats] = [:]
+    var deferredByParent: [String: [URL]] = [:]
+    var totalSize: Int64 = 0
+    var filesScanned = 0
+
+    func snapshot() -> ChartTreeBuilder.BuildResult {
+        ChartTreeBuilder.BuildResult(
+            statsByPath: stats,
+            totalSize: totalSize,
+            filesScanned: filesScanned,
+            deferredByParent: deferredByParent
+        )
+    }
+}
+
 /// Single-pass metadata tree for sunburst/treemap charts (sizes + child counts, no full listing).
 public enum ChartTreeBuilder {
     public struct NodeStats: Sendable, Equatable {
@@ -18,15 +34,52 @@ public enum ChartTreeBuilder {
         public let statsByPath: [String: NodeStats]
         public let totalSize: Int64
         public let filesScanned: Int
+        public let deferredByParent: [String: [URL]]
 
-        public init(statsByPath: [String: NodeStats], totalSize: Int64, filesScanned: Int) {
+        public init(
+            statsByPath: [String: NodeStats],
+            totalSize: Int64,
+            filesScanned: Int,
+            deferredByParent: [String: [URL]] = [:]
+        ) {
             self.statsByPath = statsByPath
             self.totalSize = totalSize
             self.filesScanned = filesScanned
+            self.deferredByParent = deferredByParent
         }
     }
 
-    public static let defaultMaxDepth = 4
+    public struct BuildOptions: Sendable {
+        public var maxDepth: Int
+        public var skipHiddenFiles: Bool
+        public var partialUpdateInterval: Int
+        public var expandedParents: Set<String>
+        public var fileSizeThreshold: Int64?
+
+        public init(
+            maxDepth: Int = defaultMaxDepth,
+            skipHiddenFiles: Bool = true,
+            partialUpdateInterval: Int = 40,
+            expandedParents: Set<String> = [],
+            fileSizeThreshold: Int64? = nil
+        ) {
+            self.maxDepth = max(0, maxDepth)
+            self.skipHiddenFiles = skipHiddenFiles
+            self.partialUpdateInterval = max(32, partialUpdateInterval)
+            self.expandedParents = expandedParents
+            self.fileSizeThreshold = fileSizeThreshold
+        }
+
+        public static let chartPreview = BuildOptions()
+    }
+
+    public static let defaultMaxDepth = 3
+
+    private static let sizeKeys: [URLResourceKey] = [
+        .totalFileAllocatedSizeKey,
+        .fileSizeKey,
+        .isRegularFileKey
+    ]
 
     public static func build(
         at root: URL,
@@ -36,74 +89,76 @@ public enum ChartTreeBuilder {
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (BuildResult) -> Void)? = nil
     ) -> BuildResult {
+        build(
+            at: root,
+            listedEntries: listedChildren.map {
+                DiskItem(url: $0, isDirectory: true, isScanning: false)
+            },
+            options: BuildOptions(
+                maxDepth: maxDepth,
+                skipHiddenFiles: configuration.skipHiddenFiles,
+                partialUpdateInterval: configuration.partialUpdateInterval,
+                expandedParents: Set([PathUtils.resolved(root).path])
+            ),
+            shouldCancel: shouldCancel,
+            onPartial: onPartial
+        )
+    }
+
+    public static func build(
+        at root: URL,
+        listedEntries: [DiskItem],
+        options: BuildOptions = .chartPreview,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (BuildResult) -> Void)? = nil
+    ) -> BuildResult {
         let normalizedRoot = PathUtils.resolved(root)
-        let matcher = ChildPathMatcher(root: normalizedRoot, children: listedChildren)
-
-        var stats: [String: NodeStats] = [:]
-        var totalSize: Int64 = 0
-        var filesScanned = 0
-
-        var options: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
-        if configuration.skipHiddenFiles {
-            options.insert(.skipsHiddenFiles)
-        }
-
-        let sizeKeys: [URLResourceKey] = [
-            .totalFileAllocatedSizeKey,
-            .fileSizeKey,
-            .isRegularFileKey
-        ]
-
-        guard let enumerator = FileManager.default.enumerator(
-            at: normalizedRoot,
-            includingPropertiesForKeys: sizeKeys,
-            options: options
-        ) else {
-            return BuildResult(statsByPath: [:], totalSize: 0, filesScanned: 0)
-        }
-
-        let partialInterval = configuration.partialUpdateInterval
+        let rootPath = normalizedRoot.path
+        let entries = listedEntries.filter { !$0.isVirtual && ($0.size > 0 || $0.isDirectory) }
+        let parentTotal = entries.reduce(Int64(0)) { $0 + $1.size }
+        let threshold = options.fileSizeThreshold
+            ?? ChartLazyScanPolicy.deepScanThreshold(parentTotalSize: max(parentTotal, 1))
+        let isRootExpanded = options.expandedParents.contains(rootPath)
+        let accumulator = ChartBuildAccumulator()
+        let partialInterval = options.partialUpdateInterval
         let tracksPartial = onPartial != nil
 
-        func snapshot() -> BuildResult {
-            BuildResult(statsByPath: stats, totalSize: totalSize, filesScanned: filesScanned)
-        }
-
         if tracksPartial {
-            onPartial?(snapshot())
+            onPartial?(accumulator.snapshot())
         }
 
-        for case let fileURL as URL in enumerator {
-            if let shouldCancel, shouldCancel() { break }
+        var largeChildren: [DiskItem] = []
+        var smallChildren: [DiskItem] = []
 
-            autoreleasepool {
-                guard let values = try? fileURL.resourceValues(forKeys: Set(sizeKeys)) else { return }
-                guard values.isRegularFile == true else { return }
-
-                let allocated = Int64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
-                guard allocated > 0 else { return }
-
-                totalSize += allocated
-                filesScanned += 1
-
-                let filePath = fileURL.standardizedFileURL.path
-                let resolvedPath = PathUtils.resolved(fileURL).path
-                accumulate(
-                    filePath: filePath,
-                    resolvedPath: resolvedPath,
-                    size: allocated,
-                    matcher: matcher,
-                    maxDepth: maxDepth,
-                    stats: &stats
-                )
-
-                if tracksPartial, filesScanned % partialInterval == 0 {
-                    onPartial?(snapshot())
-                }
+        for entry in entries {
+            if isRootExpanded || ChartLazyScanPolicy.shouldDeepScanChild(size: entry.size, threshold: threshold) {
+                largeChildren.append(entry)
+            } else {
+                smallChildren.append(entry)
             }
         }
 
-        let result = snapshot()
+        recordSmallChildren(
+            smallChildren,
+            rootPath: rootPath,
+            accumulator: accumulator
+        )
+
+        for child in largeChildren {
+            if let shouldCancel, shouldCancel() { break }
+            scanLargeChild(
+                child,
+                threshold: threshold,
+                options: options,
+                partialInterval: partialInterval,
+                tracksPartial: tracksPartial,
+                accumulator: accumulator,
+                shouldCancel: shouldCancel,
+                onPartial: onPartial
+            )
+        }
+
+        let result = accumulator.snapshot()
         if tracksPartial {
             onPartial?(result)
         }
@@ -114,12 +169,15 @@ public enum ChartTreeBuilder {
         from result: BuildResult,
         root: URL,
         listedEntries: [DiskItem],
-        maxChildrenPerNode: Int
+        maxChildrenPerNode: Int,
+        otherItemName: String = "Other"
     ) -> [String: [DiskItem]] {
         let rootPath = PathUtils.resolved(root).path
+        let deferredPathsByParent = deferredPathSets(from: result.deferredByParent)
         var childPathsByParent: [String: Set<String>] = [:]
 
         for (path, nodeStats) in result.statsByPath where nodeStats.size > 0 {
+            guard !ChartSubtreeOther.isVirtualOther(path) else { continue }
             guard let parent = parentPath(of: path, rootPath: rootPath) else { continue }
             childPathsByParent[parent, default: []].insert(path)
         }
@@ -131,12 +189,34 @@ public enum ChartTreeBuilder {
             }
         }
 
+        for (parentPath, deferredPaths) in deferredPathsByParent {
+            childPathsByParent[parentPath] = childPathsByParent[parentPath, default: []]
+                .filter { !deferredPaths.contains($0) }
+            let otherPath = ChartSubtreeOther.virtualPath(under: parentPath)
+            if result.statsByPath[otherPath]?.size ?? 0 > 0 {
+                childPathsByParent[parentPath, default: []].insert(otherPath)
+            }
+        }
+
+        for (path, nodeStats) in result.statsByPath where ChartSubtreeOther.isVirtualOther(path) && nodeStats.size > 0 {
+            if let parent = ChartSubtreeOther.parentPath(ofVirtualOther: path) {
+                childPathsByParent[parent, default: []].insert(path)
+            }
+        }
+
         var map: [String: [DiskItem]] = [:]
 
         for (parent, paths) in childPathsByParent {
+            let deferredPaths = deferredPathsByParent[parent] ?? []
             let items = paths
                 .map { path in
-                    diskItem(for: path, stats: result.statsByPath[path], listedEntries: listedEntries)
+                    diskItem(
+                        for: path,
+                        stats: result.statsByPath[path],
+                        listedEntries: listedEntries,
+                        deferredCount: deferredPaths.count,
+                        otherItemName: otherItemName
+                    )
                 }
                 .filter { $0.size > 0 || $0.isDirectory }
                 .sorted { $0.size > $1.size }
@@ -150,13 +230,103 @@ public enum ChartTreeBuilder {
         return map
     }
 
+    // MARK: - Lazy scan
+
+    private static func recordSmallChildren(
+        _ smallChildren: [DiskItem],
+        rootPath: String,
+        accumulator: ChartBuildAccumulator
+    ) {
+        guard !smallChildren.isEmpty else { return }
+
+        var otherSize: Int64 = 0
+        for child in smallChildren {
+            let childPath = PathUtils.resolved(child.url).path
+            accumulator.stats[childPath] = NodeStats(
+                size: child.size,
+                directFileCount: 0,
+                isDirectory: child.isDirectory
+            )
+            otherSize += child.size
+            accumulator.totalSize += child.size
+            accumulator.deferredByParent[rootPath, default: []].append(child.url)
+        }
+
+        let otherPath = ChartSubtreeOther.virtualPath(under: rootPath)
+        accumulator.stats[otherPath] = NodeStats(
+            size: otherSize,
+            directFileCount: smallChildren.count,
+            isDirectory: true
+        )
+    }
+
+    private static func scanLargeChild(
+        _ child: DiskItem,
+        threshold: Int64,
+        options: BuildOptions,
+        partialInterval: Int,
+        tracksPartial: Bool,
+        accumulator: ChartBuildAccumulator,
+        shouldCancel: (@Sendable () -> Bool)?,
+        onPartial: (@Sendable (BuildResult) -> Void)?
+    ) {
+        let childURL = PathUtils.resolved(child.url)
+        let childListed = discoverChildren(at: childURL)
+        let matcher = ChildPathMatcher(root: childURL, children: childListed)
+
+        var enumerationOptions: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
+        if options.skipHiddenFiles {
+            enumerationOptions.insert(.skipsHiddenFiles)
+        }
+
+        guard let enumerator = FileManager.default.enumerator(
+            at: childURL,
+            includingPropertiesForKeys: sizeKeys,
+            options: enumerationOptions
+        ) else {
+            return
+        }
+
+        for case let fileURL as URL in enumerator {
+            if let shouldCancel, shouldCancel() { break }
+
+            autoreleasepool {
+                guard let values = try? fileURL.resourceValues(forKeys: Set(sizeKeys)) else { return }
+                guard values.isRegularFile == true else { return }
+
+                let allocated = Int64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
+                guard allocated > 0 else { return }
+
+                accumulator.totalSize += allocated
+                accumulator.filesScanned += 1
+
+                accumulate(
+                    filePath: fileURL.standardizedFileURL.path,
+                    resolvedPath: PathUtils.resolved(fileURL).path,
+                    size: allocated,
+                    matcher: matcher,
+                    maxDepth: options.maxDepth,
+                    fileThreshold: threshold,
+                    expandedParents: options.expandedParents,
+                    accumulator: accumulator
+                )
+
+                if tracksPartial, accumulator.filesScanned % partialInterval == 0 {
+                    onPartial?(accumulator.snapshot())
+                }
+            }
+        }
+    }
+
     private static func accumulate(
         filePath: String,
         resolvedPath: String,
         size: Int64,
         matcher: ChildPathMatcher,
         maxDepth: Int,
-        stats: inout [String: NodeStats]
+        fileThreshold: Int64,
+        expandedParents: Set<String>,
+        accumulator: ChartBuildAccumulator
     ) {
         guard let childKey = matcher.immediateChildKey(for: filePath) else { return }
 
@@ -167,27 +337,47 @@ public enum ChartTreeBuilder {
 
         if components.isEmpty {
             if resolvedPath == childKey || filePath == childKey { return }
-            stats[childKey, default: NodeStats()].size += size
-            stats[childKey, default: NodeStats()].directFileCount += 1
-            stats[childKey, default: NodeStats()].isDirectory = false
+            accumulator.stats[childKey, default: NodeStats()].size += size
+            accumulator.stats[childKey, default: NodeStats()].directFileCount += 1
+            accumulator.stats[childKey, default: NodeStats()].isDirectory = false
             return
         }
 
-        stats[childKey, default: NodeStats()].size += size
-
         let directoryParts = components.dropLast()
-        var currentPath = childKey
-
-        for (index, part) in directoryParts.enumerated() {
-            guard index < maxDepth else { break }
-            currentPath += "/\(part)"
-            stats[currentPath, default: NodeStats()].size += size
-        }
-
         let parentPath = directoryParts.isEmpty
             ? childKey
             : childKey + "/" + directoryParts.joined(separator: "/")
-        stats[parentPath, default: NodeStats()].directFileCount += 1
+
+        if size < fileThreshold, !expandedParents.contains(parentPath) {
+            accumulator.stats[childKey, default: NodeStats()].size += size
+            accumulator.stats[parentPath, default: NodeStats()].size += size
+            let otherPath = ChartSubtreeOther.virtualPath(under: parentPath)
+            accumulator.stats[otherPath, default: NodeStats(isDirectory: true)].size += size
+            accumulator.stats[otherPath, default: NodeStats(isDirectory: true)].directFileCount += 1
+            accumulator.deferredByParent[parentPath, default: []].append(URL(fileURLWithPath: resolvedPath))
+            return
+        }
+
+        accumulator.stats[childKey, default: NodeStats()].size += size
+
+        var currentPath = childKey
+        for (index, part) in directoryParts.enumerated() {
+            guard index < maxDepth else { break }
+            currentPath += "/\(part)"
+            accumulator.stats[currentPath, default: NodeStats()].size += size
+        }
+
+        accumulator.stats[parentPath, default: NodeStats()].directFileCount += 1
+    }
+
+    // MARK: - Helpers
+
+    private static func deferredPathSets(from deferred: [String: [URL]]) -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for (parent, urls) in deferred {
+            result[parent] = Set(urls.map { PathUtils.resolved($0).path })
+        }
+        return result
     }
 
     private static func parentPath(of path: String, rootPath: String) -> String? {
@@ -203,8 +393,26 @@ public enum ChartTreeBuilder {
     private static func diskItem(
         for path: String,
         stats: NodeStats?,
-        listedEntries: [DiskItem]
+        listedEntries: [DiskItem],
+        deferredCount: Int,
+        otherItemName: String
     ) -> DiskItem {
+        if ChartSubtreeOther.isVirtualOther(path),
+           let parentPath = ChartSubtreeOther.parentPath(ofVirtualOther: path) {
+            let nodeStats = stats ?? NodeStats()
+            let name = deferredCount > 1
+                ? "\(otherItemName) (\(deferredCount))"
+                : otherItemName
+            return DiskItem(
+                id: ChartSubtreeOther.stableID(parentPath: parentPath),
+                url: URL(fileURLWithPath: path, isDirectory: true),
+                name: name,
+                size: nodeStats.size,
+                isDirectory: true,
+                isVirtual: true
+            )
+        }
+
         if let listed = listedEntries.first(where: { PathUtils.resolved($0.url).path == path }) {
             var item = listed
             if let stats {
@@ -221,5 +429,21 @@ public enum ChartTreeBuilder {
             isDirectory: nodeStats.isDirectory,
             isScanning: false
         )
+    }
+
+    private static func discoverChildren(at root: URL) -> [URL] {
+        let keys: [URLResourceKey] = [.isDirectoryKey]
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+
+        return contents.filter { url in
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            return values?.isDirectory == true
+        }
     }
 }

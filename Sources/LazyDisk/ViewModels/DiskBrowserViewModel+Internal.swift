@@ -96,6 +96,7 @@ extension DiskBrowserViewModel {
     }
 
     func clearChartChildMap() {
+        resetChartLazyScanState()
         publishChartChildMap([:])
         chartChildrenScanProgress = nil
     }
