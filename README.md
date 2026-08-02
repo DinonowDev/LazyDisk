@@ -12,6 +12,8 @@ A native macOS disk space analyzer and cleanup tool.
 
 ### Visualization
 
+![Sunburst Chart](assets/screenshot-sunburst.png)
+
 | Chart | Description |
 |-------|-------------|
 | **Rose Chart** | Nightingale (polar area) chart — segment area proportional to folder size, click to drill down |
