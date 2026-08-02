@@ -3,14 +3,27 @@ import Foundation
 /// Single-pass directory sizing for chart preview and folder scans.
 public enum DirectorySizeWalker {
     public struct WalkResult: Sendable, Equatable {
-        /// Full path of each immediate child → total subtree size (files only).
         public let childSizesByPath: [String: Int64]
-        /// Total size of all file content under `root`.
         public let totalSize: Int64
+        public let filesScanned: Int
 
-        public init(childSizesByPath: [String: Int64], totalSize: Int64) {
+        public init(childSizesByPath: [String: Int64], totalSize: Int64, filesScanned: Int = 0) {
             self.childSizesByPath = childSizesByPath
             self.totalSize = totalSize
+            self.filesScanned = filesScanned
+        }
+    }
+
+    public struct Configuration: Sendable {
+        public var skipHiddenFiles: Bool
+        public var partialUpdateInterval: Int
+
+        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 192)
+        public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96)
+
+        public init(skipHiddenFiles: Bool, partialUpdateInterval: Int) {
+            self.skipHiddenFiles = skipHiddenFiles
+            self.partialUpdateInterval = max(32, partialUpdateInterval)
         }
     }
 
@@ -18,28 +31,47 @@ public enum DirectorySizeWalker {
         .fileSizeKey,
         .totalFileAllocatedSizeKey,
         .isDirectoryKey,
-        .isRegularFileKey
+        .isHiddenKey
     ]
 
-    /// Sizes every immediate child of `root` with one enumerator pass over the subtree.
-    public static func immediateChildSizes(at root: URL) -> WalkResult {
+    public static func immediateChildSizes(
+        at root: URL,
+        configuration: Configuration = .default,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (WalkResult) -> Void)? = nil
+    ) -> WalkResult {
         let normalizedRoot = PathUtils.resolved(root)
         let rootPath = directoryPath(normalizedRoot)
         let prefix = rootPath + "/"
+        let prefixLength = prefix.count
 
         var childSizes: [String: Int64] = [:]
         var total: Int64 = 0
+        var filesScanned = 0
+
+        var options: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
+        if configuration.skipHiddenFiles {
+            options.insert(.skipsHiddenFiles)
+        }
 
         guard let enumerator = FileManager.default.enumerator(
             at: normalizedRoot,
             includingPropertiesForKeys: sizeKeys,
-            options: [.skipsPackageDescendants]
+            options: options
         ) else {
             let direct = directFileSize(at: normalizedRoot)
             return WalkResult(childSizesByPath: [:], totalSize: direct)
         }
 
+        let partialInterval = configuration.partialUpdateInterval
+
+        func snapshot() -> WalkResult {
+            WalkResult(childSizesByPath: childSizes, totalSize: total, filesScanned: filesScanned)
+        }
+
         for case let fileURL as URL in enumerator {
+            if let shouldCancel, shouldCancel() { break }
+
             guard let values = try? fileURL.resourceValues(forKeys: Set(sizeKeys)) else { continue }
             if values.isDirectory == true { continue }
 
@@ -47,28 +79,32 @@ public enum DirectorySizeWalker {
             guard allocated > 0 else { continue }
 
             total += allocated
+            filesScanned += 1
 
             let filePath = fileURL.standardizedFileURL.path
             guard filePath.hasPrefix(prefix) else { continue }
 
-            let relative = String(filePath.dropFirst(prefix.count))
-            guard !relative.isEmpty else { continue }
+            let relativeStart = filePath.index(filePath.startIndex, offsetBy: prefixLength)
+            guard relativeStart < filePath.endIndex else { continue }
 
-            if relative.contains("/") {
-                let firstComponent = relative.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: true)
-                    .first
-                    .map(String.init) ?? relative
-                let childPath = prefix + firstComponent
+            let relative = filePath[relativeStart...]
+            if let slash = relative.firstIndex(of: "/") {
+                let childPath = prefix + relative[..<slash]
                 childSizes[childPath, default: 0] += allocated
             } else {
                 childSizes[filePath, default: 0] += allocated
             }
+
+            if let onPartial, filesScanned % partialInterval == 0 {
+                onPartial(snapshot())
+            }
         }
 
-        return WalkResult(childSizesByPath: childSizes, totalSize: total)
+        let result = snapshot()
+        onPartial?(result)
+        return result
     }
 
-    /// Total recursive file size for a single directory path.
     public static func totalSize(of directory: URL) -> Int64 {
         immediateChildSizes(at: directory).totalSize
     }
@@ -78,15 +114,31 @@ public enum DirectorySizeWalker {
         walkResult: WalkResult
     ) -> [DiskItem] {
         items.map { item in
-            guard item.isDirectory, !item.isVirtual else {
-                if item.isDirectory { return item }
-                return item
-            }
+            guard item.isDirectory, !item.isVirtual else { return item }
 
             var updated = item
             let key = PathUtils.resolved(item.url).path
-            updated.size = walkResult.childSizesByPath[key] ?? 0
-            updated.isScanning = false
+            if let size = walkResult.childSizesByPath[key] {
+                updated.size = size
+                updated.isScanning = false
+            }
+            return updated
+        }
+    }
+
+    public static func applyPartialSizes(
+        to items: [DiskItem],
+        walkResult: WalkResult
+    ) -> [DiskItem] {
+        items.map { item in
+            guard item.isDirectory, !item.isVirtual, item.isScanning else { return item }
+
+            var updated = item
+            let key = PathUtils.resolved(item.url).path
+            if let size = walkResult.childSizesByPath[key], size > 0 {
+                updated.size = size
+                updated.isScanning = false
+            }
             return updated
         }
     }

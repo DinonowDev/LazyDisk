@@ -417,6 +417,12 @@ enum L10n {
     static func simpleChartScanCurrent(_ name: String) -> String {
         String(format: t(.simpleChartScanCurrent), name)
     }
+    static func simpleChartScanRing(_ current: Int, _ total: Int) -> String {
+        String(format: t(.simpleChartScanRing), current, total)
+    }
+    static func simpleChartScanFiles(_ count: Int) -> String {
+        String(format: t(.simpleChartScanFiles), count)
+    }
     static var selectVolume: String { t(.selectVolume) }
     static var totalCapacity: String { t(.totalCapacity) }
     static var availableLabel: String { t(.availableLabel) }

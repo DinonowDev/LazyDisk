@@ -5,9 +5,6 @@ actor DiskScanner {
     static let shared = DiskScanner()
 
     let fileManager = FileManager.default
-    var sizeCache: [String: Int64] = [:]
-    var inflightSizes: [String: Task<Int64, Never>] = [:]
-    var inflightChildWalks: [String: Task<DirectorySizeWalker.WalkResult, Never>] = [:]
 
     func listDirectory(at url: URL) async -> [DiskItem] {
         await listDirectory(at: url, light: false)
@@ -17,36 +14,35 @@ actor DiskScanner {
         await listDirectory(at: url, light: true)
     }
 
-    /// Lists immediate children and sizes every subdirectory in a single subtree walk.
     func scanFolderContents(
         at url: URL,
-        light: Bool = false
+        light: Bool = false,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable ([DiskItem], Int) -> Void)? = nil
     ) async -> [DiskItem] {
         let normalized = PathUtils.resolved(url)
         let listed = await listDirectory(at: normalized, light: light)
-        return await applySinglePassSizes(parent: normalized, items: listed)
+        let configuration: DirectorySizeWalker.Configuration = light ? .chartPreview : .default
+
+        return await applySinglePassSizes(
+            parent: normalized,
+            items: listed,
+            configuration: configuration,
+            shouldCancel: shouldCancel,
+            onPartial: { walk in
+                guard let onPartial else { return }
+                let partial = DirectorySizeWalker.applyPartialSizes(to: listed, walkResult: walk)
+                onPartial(partial, walk.filesScanned)
+            }
+        )
     }
 
     func calculateSize(for url: URL) async -> Int64 {
         let key = PathUtils.resolved(url).path
-        if let cached = sizeCache[key] {
+        if let cached = await DirectorySizeIndex.shared.size(for: key) {
             return cached
         }
-
-        if let existing = inflightSizes[key] {
-            return await existing.value
-        }
-
-        let task = Task<Int64, Never> {
-            let size = await self.childWalk(for: URL(fileURLWithPath: key, isDirectory: true)).totalSize
-            self.storeSize(size, forKey: key)
-            return size
-        }
-        inflightSizes[key] = task
-
-        let size = await task.value
-        inflightSizes.removeValue(forKey: key)
-        return size
+        return await childWalk(for: url).totalSize
     }
 
     func scanDirectorySizes(
@@ -59,7 +55,26 @@ actor DiskScanner {
         let directoryItems = items.filter { $0.isDirectory && !$0.isVirtual }
 
         if let resolvedParent, !directoryItems.isEmpty {
-            let sized = await applySinglePassSizes(parent: resolvedParent, items: items)
+            var working = items
+            let sized = await applySinglePassSizes(
+                parent: resolvedParent,
+                items: working,
+                onPartial: { walk in
+                    guard let onProgress else { return }
+                    working = DirectorySizeWalker.applyPartialSizes(to: working, walkResult: walk)
+                    for (index, item) in working.enumerated() where item.isDirectory && !item.isVirtual {
+                        guard !item.isScanning else { continue }
+                        onProgress(ScanProgressUpdate(
+                            completed: 0,
+                            total: max(directoryItems.count, 1),
+                            currentName: item.name,
+                            itemIndex: index,
+                            itemSize: item.size
+                        ))
+                    }
+                }
+            )
+
             if let onProgress {
                 var completed = 0
                 for (index, item) in sized.enumerated() where item.isDirectory && !item.isVirtual {
@@ -130,15 +145,7 @@ actor DiskScanner {
         return result.sorted { $0.size > $1.size }
     }
 
-    func clearSizeCache() {
-        for task in inflightSizes.values {
-            task.cancel()
-        }
-        for task in inflightChildWalks.values {
-            task.cancel()
-        }
-        sizeCache.removeAll()
-        inflightSizes.removeAll()
-        inflightChildWalks.removeAll()
+    func clearSizeCache() async {
+        await DirectorySizeIndex.shared.clear()
     }
 }

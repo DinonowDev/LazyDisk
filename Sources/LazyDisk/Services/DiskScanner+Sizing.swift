@@ -2,44 +2,34 @@ import Foundation
 import LazyDiskCore
 
 extension DiskScanner {
-    func applySinglePassSizes(parent: URL, items: [DiskItem]) async -> [DiskItem] {
-        let walk = await childWalk(for: parent)
-        var updated = DirectorySizeWalker.applySizes(to: items, walkResult: walk)
-
-        for index in updated.indices where updated[index].isDirectory && !updated[index].isVirtual {
-            let key = PathUtils.resolved(updated[index].url).path
-            sizeCache[key] = updated[index].size
-        }
-
-        sizeCache[PathUtils.resolved(parent).path] = walk.totalSize
-        return updated
+    func applySinglePassSizes(
+        parent: URL,
+        items: [DiskItem],
+        configuration: DirectorySizeWalker.Configuration = .default,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
+    ) async -> [DiskItem] {
+        let walk = await childWalk(
+            for: parent,
+            configuration: configuration,
+            shouldCancel: shouldCancel,
+            onPartial: onPartial
+        )
+        return DirectorySizeWalker.applySizes(to: items, walkResult: walk)
     }
 
-    func childWalk(for url: URL) async -> DirectorySizeWalker.WalkResult {
-        let key = PathUtils.resolved(url).path
-
-        if let existing = inflightChildWalks[key] {
-            return await existing.value
-        }
-
-        let task = Task<DirectorySizeWalker.WalkResult, Never> {
-            await Task.detached(priority: .utility) {
-                DirectorySizeWalker.immediateChildSizes(at: URL(fileURLWithPath: key, isDirectory: true))
-            }.value
-        }
-        inflightChildWalks[key] = task
-
-        let result = await task.value
-        inflightChildWalks.removeValue(forKey: key)
-        sizeCache[key] = result.totalSize
-        for (childPath, size) in result.childSizesByPath {
-            sizeCache[childPath] = size
-        }
-        return result
-    }
-
-    func storeSize(_ size: Int64, forKey key: String) {
-        sizeCache[key] = size
+    func childWalk(
+        for url: URL,
+        configuration: DirectorySizeWalker.Configuration = .default,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
+    ) async -> DirectorySizeWalker.WalkResult {
+        await DirectorySizeIndex.shared.walk(
+            at: url,
+            configuration: configuration,
+            shouldCancel: shouldCancel,
+            onPartial: onPartial
+        )
     }
 
     func scanDirectorySizesParallel(

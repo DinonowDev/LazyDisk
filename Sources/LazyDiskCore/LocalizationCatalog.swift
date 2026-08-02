@@ -99,7 +99,7 @@ public enum StringKey: String, CaseIterable {
     // Interface mode
     case modeSelectTitle, modeSimple, modeSimpleDesc, modeProfessional, modeProfessionalDesc, prefInterfaceMode
     case simpleChartScanning
-    case simpleChartScanProgress, simpleChartScanRemaining, simpleChartScanCurrent
+    case simpleChartScanProgress, simpleChartScanRemaining, simpleChartScanCurrent, simpleChartScanRing, simpleChartScanFiles
 }
 
 public struct LocalizationCatalog {
@@ -539,6 +539,8 @@ public struct LocalizationCatalog {
         .simpleChartScanProgress: ml(en: "%d of %d folders", fa: "%d از %d فولدر", zh: "%d / %d 文件夹", fr: "%d sur %d dossiers", ar: "%d من %d مجلد", tr: "%d / %d klasör"),
         .simpleChartScanRemaining: ml(en: "%d remaining", fa: "%d باقی‌مانده", zh: "剩余 %d", fr: "%d restants", ar: "%d متبقٍ", tr: "%d kaldı"),
         .simpleChartScanCurrent: ml(en: "Scanning: %@", fa: "در حال اسکن: %@", zh: "正在扫描：%@", fr: "Analyse : %@", ar: "جارٍ فحص: %@", tr: "Taranıyor: %@"),
+        .simpleChartScanRing: ml(en: "Ring %d of %d", fa: "حلقه %d از %d", zh: "第 %d / %d 环", fr: "Anneau %d sur %d", ar: "الحلقة %d من %d", tr: "Halka %d / %d"),
+        .simpleChartScanFiles: ml(en: "%d files indexed", fa: "%d فایل بررسی شد", zh: "已索引 %d 个文件", fr: "%d fichiers indexés", ar: "تم فهرسة %d ملف", tr: "%d dosya tarandı"),
     ]
 
     private static func ml(en: String, fa: String, zh: String, fr: String, ar: String, tr: String) -> [AppLanguage: String] {

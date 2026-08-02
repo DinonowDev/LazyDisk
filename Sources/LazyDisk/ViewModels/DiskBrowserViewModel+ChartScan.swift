@@ -30,7 +30,9 @@ extension DiskBrowserViewModel {
         chartChildrenScanProgress = ChartChildrenScanProgress(
             completedFolders: seededMap.count,
             totalFolders: max(parents.count, seededMap.count),
-            currentFolderName: ""
+            currentFolderName: "",
+            currentDepth: 1,
+            maxDepth: maxDepth + 1
         )
 
         if !seededMap.isEmpty {
@@ -48,6 +50,8 @@ extension DiskBrowserViewModel {
                 seededEntriesByParentPath: seededMap
             )
 
+            var lastPartialPublishNanos: UInt64 = 0
+
             let finalMap = await ChartScanEngine.buildChildMap(
                 request: request,
                 isCancelled: { Task.isCancelled },
@@ -57,6 +61,9 @@ extension DiskBrowserViewModel {
                     }
                 },
                 onPartial: { snapshot in
+                    let now = DispatchTime.now().uptimeNanoseconds
+                    guard now &- lastPartialPublishNanos >= 72_000_000 else { return }
+                    lastPartialPublishNanos = now
                     Task { @MainActor in
                         viewModel?.publishChartChildMap(snapshot)
                     }
