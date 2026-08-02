@@ -113,7 +113,7 @@ public struct LocalizationCatalog {
         return String(format: template, arguments: args)
     }
 
-    private static let table: [StringKey: [AppLanguage: String]] = [
+    private nonisolated(unsafe) static let table: [StringKey: [AppLanguage: String]] = [
         .collectorTitle: ml(en: "Collector", fa: "سطل جمع‌آوری", zh: "收集器", fr: "Collecteur", ar: "المجمع", tr: "Toplayıcı"),
         .collectorEmpty: ml(en: "Drag items here before deleting", fa: "آیتم‌ها را اینجا بکشید", zh: "拖放项目到此处", fr: "Glissez les éléments ici", ar: "اسحب العناصر هنا", tr: "Öğeleri buraya sürükleyin"),
         .collectorFree: ml(en: "Will free", fa: "آزاد می‌شود", zh: "将释放", fr: "Libérera", ar: "سيُحرر", tr: "Boşalacak"),
