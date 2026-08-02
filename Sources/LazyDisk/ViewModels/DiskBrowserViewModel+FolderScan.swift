@@ -31,6 +31,7 @@ extension DiskBrowserViewModel {
 
         entries = listed
         invalidateAllDerivedCaches()
+        refreshChartChildrenIfNeeded()
 
         if trackDetailedProgress {
             scanProgressFraction = 0.1

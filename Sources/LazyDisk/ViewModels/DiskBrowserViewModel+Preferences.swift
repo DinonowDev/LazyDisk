@@ -29,7 +29,7 @@ extension DiskBrowserViewModel {
     func saveSidebarWidth(_ width: CGFloat) {
         guard !isSidebarWidthTrackingPaused else { return }
 
-        let clamped = min(480, max(280, width))
+        let clamped = BrowserSidebarMetrics.clamp(width, mode: interfaceMode)
         guard abs(clamped - browserSidebarWidth) > 1 else { return }
 
         browserSidebarWidth = clamped

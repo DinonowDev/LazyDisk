@@ -3,13 +3,22 @@ import SwiftUI
 import AppKit
 
 enum FileListColumns {
-    static let spacing: CGFloat = 10
-    static let iconWidth: CGFloat = 32
-    static let sizeWidth: CGFloat = 72
-    static let chevronWidth: CGFloat = 12
     static let listPadding: CGFloat = 10
     static let rowPadding: CGFloat = 10
     static var horizontalInset: CGFloat { listPadding + rowPadding }
+
+    struct Tier: Sendable {
+        let spacing: CGFloat
+        let iconWidth: CGFloat
+        let sizeWidth: CGFloat
+        let showChevron: Bool
+
+        static let standard = Tier(spacing: 10, iconWidth: 32, sizeWidth: 72, showChevron: true)
+        static let compact = Tier(spacing: 8, iconWidth: 28, sizeWidth: 56, showChevron: false)
+        static let minimal = Tier(spacing: 6, iconWidth: 24, sizeWidth: 48, showChevron: false)
+
+        static let all: [Tier] = [.standard, .compact, .minimal]
+    }
 }
 
 struct SidebarIconButton: View {
@@ -52,7 +61,6 @@ struct FolderRowView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(color.opacity(isSelected || isHovered ? 0.22 : 0.12))
-                        .frame(width: FileListColumns.iconWidth, height: FileListColumns.iconWidth)
                     if item.isVirtual {
                         Image(systemName: "ellipsis.circle.fill").font(.system(size: 14)).foregroundStyle(.secondary)
                     } else {
@@ -66,6 +74,7 @@ struct FolderRowView: View {
                         Text(item.displayName)
                             .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
                             .lineLimit(1)
+                            .truncationMode(.tail)
                         if item.isCloudPlaceholder {
                             Image(systemName: "icloud").font(.system(size: 9)).foregroundStyle(.secondary)
                         }
@@ -75,6 +84,7 @@ struct FolderRowView: View {
                         HStack(spacing: 4) {
                             CompactProgressView(size: 10)
                             Text(L10n.scanning).font(.system(size: 9)).foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                     } else {
                         GeometryReader { geo in
@@ -92,6 +102,8 @@ struct FolderRowView: View {
                 Text(item.isScanning ? "…" : item.formattedSize)
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(item.isScanning ? .secondary : .primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             },
             trailing: {
                 Image(systemName: "chevron.right")
@@ -141,15 +153,30 @@ struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Trailing: View>
     @ViewBuilder let trailing: () -> Trailing
 
     var body: some View {
-        HStack(spacing: FileListColumns.spacing) {
+        ViewThatFits(in: .horizontal) {
+            ForEach(Array(FileListColumns.Tier.all.enumerated()), id: \.offset) { _, tier in
+                row(for: tier)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(for tier: FileListColumns.Tier) -> some View {
+        HStack(spacing: tier.spacing) {
             icon()
-                .frame(width: FileListColumns.iconWidth)
+                .frame(width: tier.iconWidth, height: tier.iconWidth)
+
             name()
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
             size()
-                .frame(width: FileListColumns.sizeWidth, alignment: .trailing)
-            trailing()
-                .frame(width: FileListColumns.chevronWidth)
+                .frame(width: tier.sizeWidth, alignment: .trailing)
+                .layoutPriority(1)
+
+            if tier.showChevron {
+                trailing()
+                    .frame(width: 12)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

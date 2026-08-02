@@ -89,6 +89,25 @@ enum SortColumn: Sendable {
     case name, size, date
 }
 
+enum BrowserSidebarMetrics {
+    static let professionalMinWidth: CGFloat = 280
+    static let professionalMaxWidth: CGFloat = 480
+    static let simpleMinWidth: CGFloat = 260
+    static let simpleMaxWidth: CGFloat = 400
+
+    static func minWidth(for mode: InterfaceMode) -> CGFloat {
+        mode == .simple ? simpleMinWidth : professionalMinWidth
+    }
+
+    static func maxWidth(for mode: InterfaceMode) -> CGFloat {
+        mode == .simple ? simpleMaxWidth : professionalMaxWidth
+    }
+
+    static func clamp(_ width: CGFloat, mode: InterfaceMode) -> CGFloat {
+        min(maxWidth(for: mode), max(minWidth(for: mode), width))
+    }
+}
+
 struct AppPreferences: Sendable {
     var sortOrder: SortOrder = .sizeDescending
     var contentFilter: ContentFilter = .all

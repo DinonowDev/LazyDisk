@@ -17,6 +17,11 @@ private final class PartialPublishGate: @unchecked Sendable {
 }
 
 extension DiskBrowserViewModel {
+    func refreshChartChildrenIfNeeded() {
+        guard chartStyle == .sunburst || chartStyle == .treemap else { return }
+        refreshChartChildren()
+    }
+
     func refreshChartChildren() {
         let needsChildren = chartStyle == .sunburst || chartStyle == .treemap
         guard needsChildren else {

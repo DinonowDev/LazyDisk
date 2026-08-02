@@ -66,6 +66,7 @@ extension DiskBrowserViewModel {
                 guard generation == navigationGeneration else { return }
                 entries = cached.entries
                 invalidateAllDerivedCaches()
+                refreshChartChildrenIfNeeded()
                 currentPath = normalized
                 isLoading = false
                 loadedFromCache = true

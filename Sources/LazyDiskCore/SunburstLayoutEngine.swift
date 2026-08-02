@@ -142,7 +142,7 @@ public enum SunburstLayoutEngine {
                    let children = childrenByParentPath[PathUtils.resolved(item.url).path],
                    !children.isEmpty, span > 2 {
                     let sorted = children
-                        .filter { $0.size > 0 }
+                        .filter { $0.size > 0 || $0.isScanning }
                         .sorted { $0.size > $1.size }
                         .prefix(config.maxChildrenPerNode)
                     layoutLevel(

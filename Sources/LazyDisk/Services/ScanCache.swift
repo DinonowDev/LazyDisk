@@ -86,15 +86,7 @@ actor ScanCache {
     }
 
     func isComplete(_ cached: CachedDirectory) -> Bool {
-        if cached.entries.contains(where: \.isScanning) {
-            return false
-        }
-
-        let directories = cached.entries.filter { $0.isDirectory && !$0.isVirtual }
-        guard !directories.isEmpty else { return true }
-
-        let allZero = directories.allSatisfy { $0.size == 0 }
-        return !allZero
+        !cached.entries.contains(where: \.isScanning)
     }
 
     func needsFullMetadata(_ cached: CachedDirectory) -> Bool {

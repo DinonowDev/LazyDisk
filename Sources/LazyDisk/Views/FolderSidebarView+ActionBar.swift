@@ -14,14 +14,19 @@ extension FolderSidebarView {
                             .foregroundStyle(Color.accentColor)
                         Text(L10n.itemsSelected(viewModel.selectedIDs.count))
                             .font(.system(size: 11, weight: .semibold))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                         Text(viewModel.selectedSize.formattedSize)
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundStyle(.secondary)
-                        Spacer()
+                            .lineLimit(1)
+                            .layoutPriority(1)
+                        Spacer(minLength: 0)
                         Button(L10n.addToCollector) {
                             viewModel.selectedItems.forEach { viewModel.addToCollector($0) }
                         }
                         .controlSize(.mini)
+                        .fixedSize()
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.08)))

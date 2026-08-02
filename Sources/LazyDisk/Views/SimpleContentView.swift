@@ -50,8 +50,14 @@ struct SimpleContentView: View {
                         set: { viewModel.setChartStyle($0) }
                     )
                 )
-                .frame(width: viewModel.browserSidebarWidth)
-                .frame(minWidth: 260, maxWidth: 400)
+                .frame(
+                    minWidth: BrowserSidebarMetrics.simpleMinWidth,
+                    idealWidth: BrowserSidebarMetrics.clamp(
+                        viewModel.browserSidebarWidth,
+                        mode: .simple
+                    ),
+                    maxWidth: BrowserSidebarMetrics.simpleMaxWidth
+                )
                 .layoutPriority(1)
                 .clipped()
                 .trackPanelWidth { viewModel.saveSidebarWidth($0) }
@@ -153,7 +159,8 @@ struct SimpleContentView: View {
     }
 
     private var chartChildrenRefreshKey: String {
-        "simple-\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(viewModel.chartCacheRevision)"
+        let path = viewModel.currentPath.map { PathUtils.resolved($0).path } ?? ""
+        return "simple-\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(path)"
     }
 
     private func setChartHover(_ id: UUID?) {

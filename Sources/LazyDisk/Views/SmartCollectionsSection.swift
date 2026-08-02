@@ -59,11 +59,15 @@ struct SmartCollectionsSection: View {
                     Text(collection.title)
                         .font(.system(size: 11, weight: isActive ? .bold : .medium))
                         .foregroundStyle(isActive ? Color.accentColor : .primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     Text(collection.subtitle)
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
                 Spacer()
 

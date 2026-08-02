@@ -75,8 +75,14 @@ struct ContentView: View {
                 recentBookmarksBar
                 FolderSidebarView()
             }
-            .frame(width: viewModel.browserSidebarWidth)
-            .frame(minWidth: 280, maxWidth: 480)
+            .frame(
+                minWidth: BrowserSidebarMetrics.professionalMinWidth,
+                idealWidth: BrowserSidebarMetrics.clamp(
+                    viewModel.browserSidebarWidth,
+                    mode: .professional
+                ),
+                maxWidth: BrowserSidebarMetrics.professionalMaxWidth
+            )
             .layoutPriority(1)
             .clipped()
             .trackPanelWidth { viewModel.saveSidebarWidth($0) }
@@ -365,7 +371,8 @@ private struct ChartPanelView: View {
     }
 
     private var chartChildrenRefreshKey: String {
-        "\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(viewModel.chartCacheRevision)"
+        let path = viewModel.currentPath.map { PathUtils.resolved($0).path } ?? ""
+        return "\(viewModel.chartStyle.rawValue)-\(viewModel.navigationAnimationID.uuidString)-\(path)"
     }
 
     private var chartPickerAlignment: Alignment {

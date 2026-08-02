@@ -30,6 +30,7 @@ extension FolderSidebarView {
                     Text(viewModel.isDetailPanelVisible ? L10n.detailTitle : L10n.panelBrowser)
                         .font(.system(size: 12, weight: .bold))
                         .lineLimit(1)
+                        .truncationMode(.tail)
                     if viewModel.loadedFromCache && !viewModel.isDetailPanelVisible {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 8))
@@ -42,23 +43,32 @@ extension FolderSidebarView {
                     if viewModel.isDetailPanelVisible, let item = viewModel.detailItem {
                         Text(item.displayName)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     } else if viewModel.isLoading {
                         CompactProgressView(size: 10)
                         Text(viewModel.scanProgress.isEmpty ? L10n.scanLive : viewModel.scanProgress)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     } else {
                         if let collection = viewModel.activeSmartCollection {
                             Text(collection.title)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         } else {
                             Text(L10n.itemsCount(viewModel.browserListEntries.count))
+                                .lineLimit(1)
                         }
                         Text("·")
                         Text(ByteFormatter.string(from: viewModel.totalSize))
+                            .lineLimit(1)
+                            .layoutPriority(1)
                     }
                 }
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 4)
 
@@ -149,17 +159,22 @@ extension FolderSidebarView {
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.activeSmartCollection?.title ?? L10n.collectionActive)
                     .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 if let progress = viewModel.smartCollectionProgress {
                     Text(progress.status)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 } else if viewModel.isScanningSmartCollection {
                     Text(L10n.collectionScanning)
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             Spacer()
             Button(L10n.cancel) { viewModel.clearSmartCollection() }
                 .buttonStyle(.borderless)
