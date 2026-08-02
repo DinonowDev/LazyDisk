@@ -34,28 +34,32 @@ struct SimpleContentView: View {
     }
 
     var body: some View {
-        HSplitView {
-            chartPanel
-                .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(0)
-                .clipped()
+        VStack(spacing: 0) {
+            HSplitView {
+                chartPanel
+                    .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
+                    .layoutPriority(0)
+                    .clipped()
 
-            SimpleFolderSidebarView(
-                hoveredID: effectiveChartHover,
-                onHover: setChartHover,
-                chartStyles: simpleChartStyles,
-                chartStyle: Binding(
-                    get: { viewModel.chartStyle },
-                    set: { viewModel.setChartStyle($0) }
+                SimpleFolderSidebarView(
+                    hoveredID: effectiveChartHover,
+                    onHover: setChartHover,
+                    chartStyles: simpleChartStyles,
+                    chartStyle: Binding(
+                        get: { viewModel.chartStyle },
+                        set: { viewModel.setChartStyle($0) }
+                    )
                 )
-            )
-            .frame(width: viewModel.browserSidebarWidth)
-            .frame(minWidth: 260, maxWidth: 400)
-            .layoutPriority(1)
+                .frame(width: viewModel.browserSidebarWidth)
+                .frame(minWidth: 260, maxWidth: 400)
+                .layoutPriority(1)
+                .clipped()
+                .trackPanelWidth { viewModel.saveSidebarWidth($0) }
+            }
             .clipped()
-            .trackPanelWidth { viewModel.saveSidebarWidth($0) }
+
+            CollectorView()
         }
-        .clipped()
         .environment(\.layoutDirection, .leftToRight)
         .background(Color(nsColor: .windowBackgroundColor))
         .keyboardShortcuts()
