@@ -1,4 +1,5 @@
 import Foundation
+import LazyDiskCore
 
 /// Shared size cache and coordinated subtree walks (dedupes concurrent requests).
 public actor DirectorySizeIndex {
@@ -9,6 +10,16 @@ public actor DirectorySizeIndex {
 
     public func size(for path: String) -> Int64? {
         sizesByPath[path]
+    }
+
+    public func sizesSnapshot() -> [String: Int64] {
+        sizesByPath
+    }
+
+    public func importSizes(_ sizes: [String: Int64]) {
+        for (path, size) in sizes where size > 0 {
+            sizesByPath[path] = size
+        }
     }
 
     public func walk(
@@ -50,6 +61,13 @@ public actor DirectorySizeIndex {
 
     public func storeSize(_ size: Int64, for path: String) {
         sizesByPath[path] = size
+    }
+
+    public func invalidate(prefix: String) {
+        let normalized = prefix.hasSuffix("/") ? String(prefix.dropLast()) : prefix
+        sizesByPath = sizesByPath.filter { key, _ in
+            key != normalized && !key.hasPrefix(normalized + "/")
+        }
     }
 
     public func clear() {

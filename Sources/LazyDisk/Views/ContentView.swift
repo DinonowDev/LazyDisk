@@ -67,8 +67,9 @@ struct ContentView: View {
     private var browserContent: some View {
         HSplitView {
             mainPanel
-                .frame(minWidth: 520)
-                .layoutPriority(1)
+                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(0)
+                .clipped()
 
             VStack(spacing: 0) {
                 recentBookmarksBar
@@ -76,9 +77,11 @@ struct ContentView: View {
             }
             .frame(width: viewModel.browserSidebarWidth)
             .frame(minWidth: 280, maxWidth: 480)
-            .layoutPriority(0)
+            .layoutPriority(1)
+            .clipped()
             .trackPanelWidth { viewModel.saveSidebarWidth($0) }
         }
+        .clipped()
     }
 
     private var recentBookmarksBar: some View {

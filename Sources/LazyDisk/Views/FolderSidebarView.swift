@@ -69,6 +69,8 @@ struct FolderSidebarView: View {
                 actionBar
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .background(sidebarBackground)
     }
 }

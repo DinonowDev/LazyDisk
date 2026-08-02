@@ -1,6 +1,20 @@
 // DiskBrowserViewModel+ChartScan.swift — Fast parallel chart child discovery for sunburst/treemap.
 import Foundation
 
+private final class PartialPublishGate: @unchecked Sendable {
+    private var lastPublishNanos: UInt64 = 0
+    private let lock = NSLock()
+
+    func shouldPublish() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let now = DispatchTime.now().uptimeNanoseconds
+        guard now &- lastPublishNanos >= 72_000_000 else { return false }
+        lastPublishNanos = now
+        return true
+    }
+}
+
 extension DiskBrowserViewModel {
     func refreshChartChildren() {
         let needsChildren = chartStyle == .sunburst || chartStyle == .treemap
@@ -39,7 +53,7 @@ extension DiskBrowserViewModel {
             publishChartChildMap(seededMap)
         }
 
-        chartChildRefreshTask = Task.detached(priority: .utility) { [weak viewModel = self] in
+        chartChildRefreshTask = Task.detached(priority: .utility) { [weak self] in
             try? await Task.sleep(nanoseconds: 16_000_000)
             guard !Task.isCancelled else { return }
 
@@ -50,36 +64,36 @@ extension DiskBrowserViewModel {
                 seededEntriesByParentPath: seededMap
             )
 
-            var lastPartialPublishNanos: UInt64 = 0
+            let partialPublishGate = PartialPublishGate()
 
             let finalMap = await ChartScanEngine.buildChildMap(
                 request: request,
                 isCancelled: { Task.isCancelled },
                 onProgress: { progress in
-                    Task { @MainActor in
-                        viewModel?.chartChildrenScanProgress = progress
+                    Task { @MainActor [weak self] in
+                        self?.chartChildrenScanProgress = progress
                     }
                 },
                 onPartial: { snapshot in
-                    let now = DispatchTime.now().uptimeNanoseconds
-                    guard now &- lastPartialPublishNanos >= 72_000_000 else { return }
-                    lastPartialPublishNanos = now
-                    Task { @MainActor in
-                        viewModel?.publishChartChildMap(snapshot)
+                    guard partialPublishGate.shouldPublish() else { return }
+                    Task { @MainActor [weak self] in
+                        self?.publishChartChildMap(snapshot)
                     }
                 },
                 chartChildren: { entries in
-                    await MainActor.run {
-                        viewModel?.chartChildren(from: entries) ?? []
+                    await MainActor.run { [weak self] in
+                        self?.chartChildren(from: entries) ?? []
                     }
                 }
             )
 
             guard !Task.isCancelled else { return }
-            await MainActor.run {
-                viewModel?.isChartChildrenLoading = false
-                viewModel?.chartChildrenScanProgress = nil
-                viewModel?.publishChartChildMap(finalMap)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isChartChildrenLoading = false
+                self.chartChildrenScanProgress = nil
+                self.publishChartChildMap(finalMap)
+                self.startSmartPrefetch(chartMap: finalMap)
             }
         }
     }

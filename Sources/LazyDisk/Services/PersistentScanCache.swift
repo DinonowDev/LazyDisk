@@ -83,15 +83,23 @@ private struct StoredCachedDirectory: Codable {
     let entries: [DiskItem]
     let scannedAt: Date
     let isVolumeRoot: Bool
+    let contentLevel: ScanContentLevel?
 
     init(cachedDirectory: CachedDirectory) {
         url = cachedDirectory.url
         entries = cachedDirectory.entries
         scannedAt = cachedDirectory.scannedAt
         isVolumeRoot = cachedDirectory.isVolumeRoot
+        contentLevel = cachedDirectory.contentLevel
     }
 
     var cachedDirectory: CachedDirectory {
-        CachedDirectory(url: url, entries: entries, scannedAt: scannedAt, isVolumeRoot: isVolumeRoot)
+        CachedDirectory(
+            url: url,
+            entries: entries,
+            scannedAt: scannedAt,
+            isVolumeRoot: isVolumeRoot,
+            contentLevel: contentLevel ?? .full
+        )
     }
 }

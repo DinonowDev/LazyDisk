@@ -17,6 +17,7 @@ extension DiskBrowserViewModel {
         }
         selectedVolume = volume
         restartFilesystemMonitoring()
+        warmSizeIndexForSelectedVolume()
         if appPhase == .ready {
             navigate(to: volume.scanRoot)
         }
@@ -59,6 +60,8 @@ extension DiskBrowserViewModel {
         recentFolders = NavigationHistoryService.recentFolders()
 
         scanTask = Task {
+            let isVolumeRoot = normalized.path == PathUtils.resolved(selectedVolume?.scanRoot ?? normalized).path
+
             if let cached = await cache.get(normalized), await cache.isComplete(cached) {
                 guard generation == navigationGeneration else { return }
                 entries = cached.entries
@@ -67,6 +70,17 @@ extension DiskBrowserViewModel {
                 isLoading = false
                 loadedFromCache = true
                 scanProgress = L10n.scanFromCache
+
+                startSmartPrefetch()
+
+                if cached.contentLevel == .light {
+                    await upgradeContentMetadata(
+                        at: normalized,
+                        volume: selectedVolume,
+                        isVolumeRoot: isVolumeRoot,
+                        generation: generation
+                    )
+                }
                 return
             }
 
@@ -77,7 +91,7 @@ extension DiskBrowserViewModel {
             await performScan(
                 at: normalized,
                 volume: selectedVolume,
-                isVolumeRoot: normalized.path == PathUtils.resolved(selectedVolume?.scanRoot ?? normalized).path,
+                isVolumeRoot: isVolumeRoot,
                 trackDetailedProgress: false,
                 generation: generation
             )
@@ -85,7 +99,7 @@ extension DiskBrowserViewModel {
             isLoading = false
             scanProgress = ""
 
-            startPrefetching(from: entries)
+            startSmartPrefetch()
         }
     }
 

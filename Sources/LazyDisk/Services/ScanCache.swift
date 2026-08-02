@@ -1,10 +1,26 @@
 import Foundation
+import LazyDiskCore
 
 struct CachedDirectory: Sendable {
     let url: URL
     var entries: [DiskItem]
     let scannedAt: Date
     let isVolumeRoot: Bool
+    var contentLevel: ScanContentLevel
+
+    init(
+        url: URL,
+        entries: [DiskItem],
+        scannedAt: Date,
+        isVolumeRoot: Bool,
+        contentLevel: ScanContentLevel = .full
+    ) {
+        self.url = url
+        self.entries = entries
+        self.scannedAt = scannedAt
+        self.isVolumeRoot = isVolumeRoot
+        self.contentLevel = contentLevel
+    }
 }
 
 actor ScanCache {
@@ -32,12 +48,18 @@ actor ScanCache {
         return disk
     }
 
-    func set(_ url: URL, entries: [DiskItem], isVolumeRoot: Bool) async {
+    func set(
+        _ url: URL,
+        entries: [DiskItem],
+        isVolumeRoot: Bool,
+        contentLevel: ScanContentLevel = .full
+    ) async {
         let cached = CachedDirectory(
             url: url,
             entries: entries,
             scannedAt: Date(),
-            isVolumeRoot: isVolumeRoot
+            isVolumeRoot: isVolumeRoot,
+            contentLevel: contentLevel
         )
         store[key(for: url)] = cached
 
@@ -73,5 +95,9 @@ actor ScanCache {
 
         let allZero = directories.allSatisfy { $0.size == 0 }
         return !allZero
+    }
+
+    func needsFullMetadata(_ cached: CachedDirectory) -> Bool {
+        cached.contentLevel == .light
     }
 }

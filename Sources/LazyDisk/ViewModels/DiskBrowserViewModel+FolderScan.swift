@@ -1,10 +1,10 @@
-// DiskBrowserViewModel+FolderScan.swift — Per-folder scan and background prefetch.
+// DiskBrowserViewModel+FolderScan.swift — Per-folder scan, lazy content, and smart prefetch.
 import AppKit
 import Foundation
 import SwiftUI
 
 extension DiskBrowserViewModel {
-    // MARK: - Private
+    // MARK: - Scan
 
     func performScan(
         at url: URL,
@@ -72,7 +72,13 @@ extension DiskBrowserViewModel {
 
         entries = sorted
         invalidateAllDerivedCaches()
-        await cache.set(normalized, entries: sorted, isVolumeRoot: isVolumeRoot)
+        await cache.set(
+            normalized,
+            entries: sorted,
+            isVolumeRoot: isVolumeRoot,
+            contentLevel: .full
+        )
+        scheduleSizeIndexPersist()
 
         if trackDetailedProgress {
             scanProgressFraction = 0.92
@@ -80,9 +86,76 @@ extension DiskBrowserViewModel {
         }
     }
 
+    func upgradeContentMetadata(
+        at url: URL,
+        volume: VolumeInfo?,
+        isVolumeRoot: Bool,
+        generation: UInt
+    ) async {
+        guard generation == navigationGeneration else { return }
+
+        let upgraded = await scanner.upgradeToFullContent(at: url, existing: entries)
+        guard generation == navigationGeneration else { return }
+
+        var sorted = sortOrder.sort(upgraded)
+        if isVolumeRoot, let volume {
+            sorted = await scanner.reconcileWithVolumeUsage(
+                items: sorted,
+                volume: volume,
+                atVolumeRoot: true
+            )
+        }
+
+        entries = sorted
+        invalidateAllDerivedCaches()
+        await cache.set(
+            url,
+            entries: sorted,
+            isVolumeRoot: isVolumeRoot,
+            contentLevel: .full
+        )
+        scheduleSizeIndexPersist()
+    }
+
+    func scheduleSizeIndexPersist() {
+        let volumeID = selectedVolume?.id
+        Task {
+            await SizeIndexCoordinator.shared.schedulePersist(for: volumeID)
+        }
+    }
+
+    func warmSizeIndexForSelectedVolume() {
+        guard let volume = selectedVolume else { return }
+        Task {
+            await SizeIndexCoordinator.shared.warm(for: volume)
+        }
+    }
+
+    // MARK: - Prefetch
+
+    func startSmartPrefetch(chartMap: [String: [DiskItem]]? = nil) {
+        let map = chartMap ?? chartChildMap
+        let parents = chartItems.filter { $0.isDirectory && !$0.isVirtual }
+        let plan = ChartPrefetchPlanner.plan(
+            chartMap: map,
+            chartParents: parents,
+            siblings: entries
+        )
+        startPrefetching(directories: plan)
+    }
+
     func startPrefetching(from items: [DiskItem]) {
+        let directories = items
+            .filter { $0.isDirectory && !$0.isVirtual }
+            .sorted { $0.size > $1.size }
+        startPrefetching(directories: directories)
+    }
+
+    private func startPrefetching(directories: [DiskItem]) {
         prefetchTask?.cancel()
-        let directories = items.filter { $0.isDirectory && !$0.isVirtual }
+        guard !directories.isEmpty else { return }
+
+        let volumeID = selectedVolume?.id
 
         prefetchTask = Task.detached(priority: .utility) { [weak viewModel = self] in
             let total = directories.count
@@ -102,11 +175,18 @@ extension DiskBrowserViewModel {
                     url: folderURL,
                     entries: sorted,
                     scannedAt: Date(),
-                    isVolumeRoot: false
+                    isVolumeRoot: false,
+                    contentLevel: .light
                 )
                 guard await ScanCache.shared.isComplete(cached) else { continue }
 
-                await ScanCache.shared.set(folderURL, entries: sorted, isVolumeRoot: false)
+                await ScanCache.shared.set(
+                    folderURL,
+                    entries: sorted,
+                    isVolumeRoot: false,
+                    contentLevel: .light
+                )
+                await SizeIndexCoordinator.shared.schedulePersist(for: volumeID)
 
                 let folderName = item.name
                 let prefetchIndex = index
@@ -122,5 +202,4 @@ extension DiskBrowserViewModel {
             }
         }
     }
-
 }

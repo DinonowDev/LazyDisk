@@ -194,7 +194,12 @@ enum ChartScanEngine {
             return ([], latestFilesScanned)
         }
 
-        await ScanCache.shared.set(folderURL, entries: sorted, isVolumeRoot: false)
+        await ScanCache.shared.set(
+            folderURL,
+            entries: sorted,
+            isVolumeRoot: false,
+            contentLevel: .light
+        )
         let children = await chartChildren(sorted)
         return (children, latestFilesScanned)
     }

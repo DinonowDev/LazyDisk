@@ -80,6 +80,11 @@ extension DiskBrowserViewModel {
         }
         guard affectsCurrentView else { return }
 
+        let volumeID = selectedVolume?.id
+        for path in changedPaths {
+            await SizeIndexCoordinator.shared.invalidate(prefix: path, volumeID: volumeID)
+        }
+
         await applyLightweightFolderRefresh(changedPaths: changedPaths)
     }
 
@@ -116,7 +121,7 @@ extension DiskBrowserViewModel {
             )
         }
 
-        await cache.set(normalized, entries: merged, isVolumeRoot: isAtVolumeRoot)
+        await cache.set(normalized, entries: merged, isVolumeRoot: isAtVolumeRoot, contentLevel: .full)
 
         let indicesToRecalc = merged.enumerated().compactMap { index, item -> Int? in
             guard item.isDirectory, !item.isVirtual else { return nil }
@@ -147,6 +152,7 @@ extension DiskBrowserViewModel {
         }
 
         let finalEntries = updatedEntries
+        scheduleSizeIndexPersist()
         publishAfterCurrentUpdate { [weak self] in
             self?.entries = finalEntries
             self?.invalidateAllDerivedCaches()

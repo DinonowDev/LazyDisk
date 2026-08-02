@@ -48,6 +48,8 @@ extension FolderSidebarView {
                 .padding(.horizontal, FileListColumns.listPadding)
                 .padding(.vertical, 4)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
             .onChange(of: viewModel.keyboardFocusedIndex) { index in
                 guard index < viewModel.browserListEntries.count else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {

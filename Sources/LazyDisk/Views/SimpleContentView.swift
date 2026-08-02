@@ -36,8 +36,9 @@ struct SimpleContentView: View {
     var body: some View {
         HSplitView {
             chartPanel
-                .frame(minWidth: 480)
-                .layoutPriority(1)
+                .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(0)
+                .clipped()
 
             SimpleFolderSidebarView(
                 hoveredID: effectiveChartHover,
@@ -50,9 +51,11 @@ struct SimpleContentView: View {
             )
             .frame(width: viewModel.browserSidebarWidth)
             .frame(minWidth: 260, maxWidth: 400)
-            .layoutPriority(0)
+            .layoutPriority(1)
+            .clipped()
             .trackPanelWidth { viewModel.saveSidebarWidth($0) }
         }
+        .clipped()
         .environment(\.layoutDirection, .leftToRight)
         .background(Color(nsColor: .windowBackgroundColor))
         .keyboardShortcuts()

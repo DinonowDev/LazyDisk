@@ -145,7 +145,7 @@ struct FileListColumnsLayout<Icon: View, Name: View, Size: View, Trailing: View>
             icon()
                 .frame(width: FileListColumns.iconWidth)
             name()
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             size()
                 .frame(width: FileListColumns.sizeWidth, alignment: .trailing)
             trailing()

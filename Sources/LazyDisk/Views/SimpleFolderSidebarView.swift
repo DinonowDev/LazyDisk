@@ -28,7 +28,8 @@ struct SimpleFolderSidebarView: View {
 
             storageFooter
         }
-        .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
         .background(sidebarBackground)
     }
 
@@ -143,6 +144,8 @@ struct SimpleFolderSidebarView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 
     private var emptyState: some View {
@@ -227,15 +230,17 @@ private struct SimpleFolderRow: View {
                 .foregroundStyle(item.isVirtual ? .secondary : .primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
             if item.isScanning {
                 CompactProgressView(size: 10)
+                    .fixedSize()
             } else {
                 Text(item.formattedSize)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .environment(\.layoutDirection, .leftToRight)
+                    .fixedSize()
             }
         }
         .padding(.horizontal, 10)

@@ -46,7 +46,7 @@ extension DiskScanner {
         return await withTaskGroup(of: (Int, Int64).self) { group in
             var nextDirIndex = 0
             var inFlight = 0
-            var updated = items
+            var sizesByIndex: [Int: Int64] = [:]
             var completed = 0
 
             func enqueueNext() {
@@ -66,8 +66,7 @@ extension DiskScanner {
             for await (index, size) in group {
                 inFlight -= 1
                 completed += 1
-                updated[index].size = size
-                updated[index].isScanning = false
+                sizesByIndex[index] = size
                 onProgress?(ScanProgressUpdate(
                     completed: completed,
                     total: max(total, 1),
@@ -78,7 +77,13 @@ extension DiskScanner {
                 enqueueNext()
             }
 
-            return updated
+            return items.enumerated().map { index, item in
+                guard let size = sizesByIndex[index] else { return item }
+                var updated = item
+                updated.size = size
+                updated.isScanning = false
+                return updated
+            }
         }
     }
 }
