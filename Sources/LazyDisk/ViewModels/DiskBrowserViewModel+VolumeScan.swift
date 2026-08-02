@@ -11,13 +11,23 @@ extension DiskBrowserViewModel {
         Task {
             let vols = await scanner.listVolumes()
             volumes = vols
-            if selectedVolume == nil {
+
+            let session = SessionStateStore.load()
+            if let lastID = session.lastVolumeID,
+               let restored = vols.first(where: { $0.id == lastID }) {
+                selectedVolume = restored
+            } else if selectedVolume == nil {
                 selectedVolume = vols.first(where: { $0.url.path == "/" }) ?? vols.first
             }
+
             if let volume = selectedVolume {
                 await SizeIndexCoordinator.shared.warm(for: volume)
             }
             restartFilesystemMonitoring()
+
+            if await attemptAutoRestoreFromCache() {
+                return
+            }
         }
     }
 
@@ -30,6 +40,7 @@ extension DiskBrowserViewModel {
 
         scanTask?.cancel()
         prefetchTask?.cancel()
+        incrementalRefreshTask?.cancel()
         cancelDepthPrefetch()
         appPhase = .scanning
         scanProgressFraction = 0
@@ -40,19 +51,26 @@ extension DiskBrowserViewModel {
         hoveredID = nil
 
         scanTask = Task {
-            await cache.clear()
-            await SizeIndexCoordinator.shared.clear(volumeID: volume.id)
-            await PersistentChartScanProgressStore.shared.clear(volumeID: volume.id)
-            await scanner.clearSizeCache()
-            if let volume = selectedVolume {
+            let hasCachedRoot = await cache.hasRestorableVolumeRoot(volume.scanRoot)
+
+            if hasCachedRoot {
+                await performIncrementalScan(
+                    at: volume.scanRoot,
+                    volume: volume,
+                    isVolumeRoot: true,
+                    trackDetailedProgress: true
+                )
+            } else {
+                await PersistentChartScanProgressStore.shared.clear(volumeID: volume.id)
+                await scanner.clearSizeCache()
                 await globalSearch.invalidateIndex(for: volume)
+                await performScan(
+                    at: volume.scanRoot,
+                    volume: volume,
+                    isVolumeRoot: true,
+                    trackDetailedProgress: true
+                )
             }
-            await performScan(
-                at: volume.scanRoot,
-                volume: volume,
-                isVolumeRoot: true,
-                trackDetailedProgress: true
-            )
 
             guard !Task.isCancelled else { return }
 
@@ -62,6 +80,7 @@ extension DiskBrowserViewModel {
 
             startSearchIndexBuild()
             saveScanSnapshot(volume: volume)
+            SessionStateStore.save(volumeID: volume.id, path: volume.scanRoot)
 
             withAnimation(.easeInOut(duration: 0.35)) {
                 appPhase = .ready
@@ -77,6 +96,7 @@ extension DiskBrowserViewModel {
     func cancelScan() {
         scanTask?.cancel()
         prefetchTask?.cancel()
+        incrementalRefreshTask?.cancel()
         cancelDepthPrefetch()
         scanTask = nil
         isLoading = false
@@ -92,18 +112,12 @@ extension DiskBrowserViewModel {
 
         scanTask?.cancel()
         prefetchTask?.cancel()
+        incrementalRefreshTask?.cancel()
         cancelDepthPrefetch()
         isLoading = true
-        scanProgress = L10n.scanPreparing
+        scanProgress = L10n.scanIncrementalChecking
         scanTask = Task {
-            await cache.clear()
-            await SizeIndexCoordinator.shared.clear(volumeID: volume.id)
-            await PersistentChartScanProgressStore.shared.clear(volumeID: volume.id)
-            await scanner.clearSizeCache()
-            if let volume = selectedVolume {
-                await globalSearch.invalidateIndex(for: volume)
-            }
-            await performScan(
+            await performIncrementalScan(
                 at: volume.scanRoot,
                 volume: volume,
                 isVolumeRoot: true,
@@ -115,7 +129,7 @@ extension DiskBrowserViewModel {
             let resolvedRoot = PathUtils.resolved(volume.scanRoot)
             if resolvedPrevious.path != resolvedRoot.path,
                PathUtils.isWithinVolume(resolvedPrevious, scanRoot: volume.scanRoot) {
-                await performScan(
+                await performIncrementalScan(
                     at: resolvedPrevious,
                     volume: volume,
                     isVolumeRoot: false,
@@ -130,6 +144,7 @@ extension DiskBrowserViewModel {
 
             startSearchIndexBuild()
             saveScanSnapshot(volume: volume)
+            SessionStateStore.save(volumeID: volume.id, path: currentPath ?? volume.scanRoot)
             isLoading = false
             scanProgress = ""
             scanProgressFraction = 1

@@ -58,6 +58,7 @@ extension DiskBrowserViewModel {
         keyboardFocusedIndex = 0
         NavigationHistoryService.recordVisit(normalized)
         recentFolders = NavigationHistoryService.recentFolders()
+        SessionStateStore.save(volumeID: selectedVolume?.id, path: normalized)
 
         scanTask = Task {
             let isVolumeRoot = normalized.path == PathUtils.resolved(selectedVolume?.scanRoot ?? normalized).path
@@ -105,11 +106,15 @@ extension DiskBrowserViewModel {
     }
 
     func refreshCurrentFolder() {
-        guard let path = currentPath else { return }
+        guard let path = currentPath, let volume = selectedVolume else { return }
         prefetchTask?.cancel()
         Task {
-            await cache.invalidate(path)
-            navigate(to: path)
+            await performIncrementalScan(
+                at: path,
+                volume: volume,
+                isVolumeRoot: isAtVolumeRoot,
+                trackDetailedProgress: false
+            )
         }
     }
 

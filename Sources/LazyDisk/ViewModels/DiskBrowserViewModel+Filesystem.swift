@@ -83,74 +83,17 @@ extension DiskBrowserViewModel {
         let volumeID = selectedVolume?.id
         for path in changedPaths {
             await SizeIndexCoordinator.shared.invalidate(prefix: path, volumeID: volumeID)
+            await cache.invalidate(URL(fileURLWithPath: path, isDirectory: true))
         }
 
-        await applyLightweightFolderRefresh(changedPaths: changedPaths)
-    }
-
-    func applyLightweightFolderRefresh(changedPaths: [String]) async {
-        guard let currentPath, let volume = selectedVolume else { return }
+        guard let volume = selectedVolume else { return }
         let normalized = PathUtils.resolved(currentPath)
-
-        let listed = await scanner.listDirectory(at: normalized)
-        let existingByPath = Dictionary(
-            uniqueKeysWithValues: entries.map { (PathUtils.resolved($0.url).path, $0) }
-        )
-
-        var merged: [DiskItem] = listed.map { item in
-            let path = PathUtils.resolved(item.url).path
-            if item.isDirectory,
-               let existing = existingByPath[path],
-               existing.size > 0,
-               !existing.isScanning {
-                var copy = item
-                copy.size = existing.size
-                copy.isScanning = false
-                return copy
-            }
-            return item
-        }
-
-        merged = sortOrder.sort(merged)
-
-        if isAtVolumeRoot {
-            merged = await scanner.reconcileWithVolumeUsage(
-                items: merged,
-                volume: volume,
-                atVolumeRoot: true
-            )
-        }
-
-        await cache.set(normalized, entries: merged, isVolumeRoot: isAtVolumeRoot, contentLevel: .full)
-
-        let prefs = AppPreferences.load()
-        let sizingConfiguration = prefs.sizingConfiguration(fast: true)
-        let directoryURLs = merged
-            .filter { $0.isDirectory && !$0.isVirtual }
-            .map(\.url)
-
-        let walk = await DirectorySizeIndex.shared.rescanSubtree(
+        await performIncrementalScan(
             at: normalized,
-            listedChildren: directoryURLs,
-            configuration: sizingConfiguration
+            volume: volume,
+            isVolumeRoot: isAtVolumeRoot,
+            trackDetailedProgress: false
         )
-        var updatedEntries = DirectorySizeWalker.applySizes(to: merged, walkResult: walk)
-
-        updatedEntries = sortOrder.sort(updatedEntries)
-        if isAtVolumeRoot {
-            updatedEntries = await scanner.reconcileWithVolumeUsage(
-                items: updatedEntries,
-                volume: volume,
-                atVolumeRoot: true
-            )
-        }
-
-        let finalEntries = updatedEntries
-        scheduleSizeIndexPersist()
-        publishAfterCurrentUpdate { [weak self] in
-            self?.entries = finalEntries
-            self?.invalidateAllDerivedCaches()
-        }
     }
 
 }

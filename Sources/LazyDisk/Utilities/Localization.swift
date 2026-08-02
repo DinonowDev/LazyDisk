@@ -495,6 +495,13 @@ enum L10n {
     static var scanFinalizing: String { t(.scanFinalizing) }
     static var scanCaching: String { t(.scanCaching) }
     static func scanCachingFolders(_ done: Int, _ total: Int) -> String { String(format: t(.scanCachingFolders), done, total) }
+    static var scanIncrementalChecking: String { t(.scanIncrementalChecking) }
+    static var scanIncrementalUpToDate: String { t(.scanIncrementalUpToDate) }
+    static func scanIncrementalUpdating(_ count: Int) -> String { String(format: t(.scanIncrementalUpdating), count) }
+    static var scanIncrementalDone: String { t(.scanIncrementalDone) }
+    static func scanIncrementalFolder(_ done: Int, _ total: Int, _ name: String) -> String {
+        String(format: t(.scanIncrementalFolder), done, total, name)
+    }
     static func percentFmt(_ percent: Int) -> String { String(format: t(.percentFmt), percent) }
     static func progressStepFmt(_ step: Int, _ total: Int) -> String { String(format: t(.progressStepFmt), step, total) }
     static var donateTitle: String { t(.donateTitle) }

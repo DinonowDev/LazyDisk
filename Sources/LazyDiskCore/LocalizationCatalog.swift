@@ -70,6 +70,7 @@ public enum StringKey: String, CaseIterable {
     case menuBarTotal, menuBarPercent, errorDeleteFailed, errorCannotDelete, errorCannotDeleteLibraryContainer, suggestionsCount, scanProgressFmt
     case scanningDiskTitle, scanPreparing, scanReadingList, scanFoundItems
     case scanFolderNamed, scanFoldersProgress, scanFinalizing, scanCaching, scanCachingFolders
+    case scanIncrementalChecking, scanIncrementalUpToDate, scanIncrementalUpdating, scanIncrementalDone, scanIncrementalFolder
     case percentFmt, progressStepFmt
     case donateTitle, donateSubtitle, donateThankYou, donateCopy, donateCopied, donateAllNetworks, donateSupport, menuDonate
     // Chart & overview
@@ -458,6 +459,11 @@ public struct LocalizationCatalog {
         .scanFinalizing: ml(en: "Finalizing results…", fa: "نهایی‌سازی نتایج…", zh: "完成结果…", fr: "Finalisation…", ar: "إنهاء النتائج…", tr: "Sonuçlar tamamlanıyor…"),
         .scanCaching: ml(en: "Caching subfolders…", fa: "کش کردن زیرفولدرها…", zh: "缓存子文件夹…", fr: "Mise en cache…", ar: "تخزين المجلدات…", tr: "Alt klasörler önbelleğe alınıyor…"),
         .scanCachingFolders: ml(en: "Caching %d of %d folders…", fa: "کش %d از %d فولدر…", zh: "缓存 %d / %d 文件夹…", fr: "Cache %d sur %d…", ar: "تخزين %d من %d…", tr: "%d / %d klasör önbelleğe alınıyor…"),
+        .scanIncrementalChecking: ml(en: "Checking for changes…", fa: "بررسی تغییرات…", zh: "检查变更…", fr: "Vérification des changements…", ar: "التحقق من التغييرات…", tr: "Değişiklikler kontrol ediliyor…"),
+        .scanIncrementalUpToDate: ml(en: "Already up to date", fa: "به‌روز است", zh: "已是最新", fr: "Déjà à jour", ar: "محدّث بالفعل", tr: "Zaten güncel"),
+        .scanIncrementalUpdating: ml(en: "Updating %d changed folders…", fa: "به‌روزرسانی %d فولدر تغییرکرده…", zh: "更新 %d 个变更文件夹…", fr: "Mise à jour de %d dossiers modifiés…", ar: "تحديث %d مجلدات متغيرة…", tr: "%d değişen klasör güncelleniyor…"),
+        .scanIncrementalDone: ml(en: "Update complete", fa: "به‌روزرسانی انجام شد", zh: "更新完成", fr: "Mise à jour terminée", ar: "اكتمل التحديث", tr: "Güncelleme tamamlandı"),
+        .scanIncrementalFolder: ml(en: "Updating %d of %d — %@", fa: "به‌روزرسانی %d از %d — %@", zh: "更新 %d / %d — %@", fr: "Mise à jour %d sur %d — %@", ar: "تحديث %d من %d — %@", tr: "%d / %d güncelleniyor — %@"),
         .percentFmt: ml(en: "%d%%", fa: "%d%%", zh: "%d%%", fr: "%d%%", ar: "%d%%", tr: "%d%%"),
         .progressStepFmt: ml(en: "Step %d of %d", fa: "مرحله %d از %d", zh: "步骤 %d / %d", fr: "Étape %d sur %d", ar: "الخطوة %d من %d", tr: "Adım %d / %d"),
         .donateTitle: ml(en: "Support LazyDisk", fa: "حمایت از LazyDisk", zh: "支持 LazyDisk", fr: "Soutenir LazyDisk", ar: "ادعم LazyDisk", tr: "LazyDisk'i destekle"),

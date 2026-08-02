@@ -98,4 +98,14 @@ actor ScanCache {
     func needsFullMetadata(_ cached: CachedDirectory) -> Bool {
         cached.contentLevel == .light
     }
+
+    func hasRestorableVolumeRoot(_ scanRoot: URL) async -> Bool {
+        guard AppPreferences.load().usePersistentCache,
+              let cached = await get(scanRoot, usePersistent: true),
+              isComplete(cached),
+              !cached.entries.isEmpty else {
+            return false
+        }
+        return true
+    }
 }

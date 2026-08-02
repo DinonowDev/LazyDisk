@@ -132,6 +132,7 @@ final class DiskBrowserViewModel: ObservableObject {
     let historyStore = ScanHistoryStore.shared
     let fsMonitor = FilesystemChangeMonitor()
     var fsRefreshTask: Task<Void, Never>?
+    var incrementalRefreshTask: Task<Void, Never>?
     var workspaceObservers: [NSObjectProtocol] = []
     private var externalOpenObserver: NSObjectProtocol?
     var pendingExternalAnalyzeURL: URL?

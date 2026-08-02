@@ -35,7 +35,10 @@ extension DiskBrowserViewModel {
                 pendingExternalAnalyzeURL = nil
                 navigate(to: target)
             case .welcome, .permissions:
-                if appPhase != .scanning {
+                if await attemptAutoRestoreFromCache() {
+                    pendingExternalAnalyzeURL = target
+                    applyPendingExternalAnalyzeIfNeeded()
+                } else if appPhase != .scanning {
                     startInitialScan()
                 }
             case .scanning:
