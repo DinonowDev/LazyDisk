@@ -24,7 +24,6 @@ public actor DirectorySizeIndex {
 
     public func walk(
         at url: URL,
-        listedChildren: [URL]? = nil,
         configuration: DirectorySizeWalker.Configuration = .default,
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
@@ -50,7 +49,6 @@ public actor DirectorySizeIndex {
             await Task.detached(priority: .utility) {
                 DirectorySizeWalker.immediateChildSizes(
                     at: URL(fileURLWithPath: key, isDirectory: true),
-                    listedChildren: listedChildren,
                     configuration: configuration,
                     shouldCancel: shouldCancel,
                     onPartial: partialHandler

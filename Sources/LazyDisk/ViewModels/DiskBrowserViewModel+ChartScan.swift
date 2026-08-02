@@ -1,4 +1,4 @@
-// DiskBrowserViewModel+ChartScan.swift — Single-pass metadata tree for sunburst/treemap.
+// DiskBrowserViewModel+ChartScan.swift — Fast parallel chart child discovery for sunburst/treemap.
 import Foundation
 import LazyDiskCore
 
@@ -32,32 +32,33 @@ extension DiskBrowserViewModel {
         }
 
         chartChildRefreshTask?.cancel()
-
-        guard let root = currentPath ?? selectedVolume?.scanRoot else {
+        let parents = chartItems.filter { $0.isDirectory && !$0.isVirtual }
+        guard !parents.isEmpty else {
             clearChartChildMap()
             isChartChildrenLoading = false
             chartChildrenScanProgress = nil
             return
         }
 
-        let maxDepth = chartTreeMaxDepth
+        let maxDepth = interfaceMode == .simple
+            ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
+            : SunburstLayoutEngine.Config.standard.maxDepth
         let maxChildrenPerNode = interfaceMode == .simple ? 12 : 8
+        let seededMap = seededChartChildEntries(for: parents)
+        let parallelism = AppPreferences.load().scanParallelism
         let volumeID = selectedVolume?.id
+
+        let estimatedTotal = ChartWorkloadEstimator.estimateTotalFolders(
+            rootFolderCount: parents.count,
+            maxDepth: maxDepth,
+            maxChildrenPerNode: maxChildrenPerNode
+        )
 
         isChartChildrenLoading = true
 
         chartChildRefreshTask = Task.detached(priority: .utility) { [weak self] in
             try? await Task.sleep(nanoseconds: 16_000_000)
             guard !Task.isCancelled else { return }
-
-            let context = await MainActor.run { () -> (listedChildren: [URL], listedEntries: [DiskItem])? in
-                guard let self else { return nil }
-                let children = self.entries
-                    .filter { !$0.isVirtual }
-                    .map(\.url)
-                return (children, self.entries)
-            }
-            guard let context else { return }
 
             var restoredFraction: Double = 0
             if let volumeID {
@@ -67,77 +68,67 @@ extension DiskBrowserViewModel {
 
             await MainActor.run { [weak self] in
                 self?.chartChildrenScanProgress = ChartChildrenScanProgress(
-                    completedFolders: 0,
-                    totalFolders: 1,
-                    currentFolderName: root.lastPathComponent,
+                    completedFolders: seededMap.count,
+                    totalFolders: max(estimatedTotal, seededMap.count),
+                    currentFolderName: "",
                     currentDepth: 1,
                     maxDepth: maxDepth + 1,
                     displayFraction: restoredFraction
                 )
+                if !seededMap.isEmpty {
+                    self?.publishChartChildMap(seededMap)
+                }
             }
+
+            let request = ChartScanEngine.Request(
+                parents: parents,
+                maxDepth: maxDepth,
+                parallelism: parallelism,
+                maxChildrenPerNode: maxChildrenPerNode,
+                seededEntriesByParentPath: seededMap,
+                restoredDisplayFraction: restoredFraction
+            )
 
             let partialPublishGate = PartialPublishGate()
 
-            let buildResult = ChartTreeBuilder.build(
-                at: root,
-                listedChildren: context.listedChildren,
-                maxDepth: maxDepth,
-                configuration: .chartPreview,
-                shouldCancel: { Task.isCancelled },
-                onPartial: { partial in
-                    let fraction = min(
-                        0.99,
-                        Double(partial.filesScanned) / Double(max(partial.filesScanned + 500, 1))
-                    )
-
+            let finalMap = await ChartScanEngine.buildChildMap(
+                request: request,
+                isCancelled: { Task.isCancelled },
+                onProgress: { progress in
                     if let volumeID {
                         Task {
                             await PersistentChartScanProgressStore.shared.scheduleSave(
                                 volumeID: volumeID,
-                                displayFraction: max(restoredFraction, fraction),
-                                completedFolders: 0,
-                                estimatedTotalFolders: 1
+                                displayFraction: progress.displayFraction,
+                                completedFolders: progress.completedFolders,
+                                estimatedTotalFolders: progress.totalFolders
                             )
                         }
                     }
 
-                    guard partialPublishGate.shouldPublish() else { return }
-
-                    let snapshot = ChartTreeBuilder.childMap(
-                        from: partial,
-                        root: root,
-                        listedEntries: context.listedEntries,
-                        maxChildrenPerNode: maxChildrenPerNode
-                    )
-
                     Task { @MainActor [weak self] in
                         guard let self else { return }
-                        self.chartChildrenScanProgress = ChartChildrenScanProgress(
-                            completedFolders: 0,
-                            totalFolders: 1,
-                            currentFolderName: root.lastPathComponent,
-                            currentDepth: 1,
-                            maxDepth: maxDepth + 1,
-                            filesScanned: partial.filesScanned,
-                            displayFraction: max(
-                                self.chartChildrenScanProgress?.displayFraction ?? 0,
-                                fraction
-                            )
-                        )
-                        self.publishChartChildMap(snapshot)
+                        if let current = self.chartChildrenScanProgress {
+                            self.chartChildrenScanProgress = current.advancing(to: progress)
+                        } else {
+                            self.chartChildrenScanProgress = progress
+                        }
+                    }
+                },
+                onPartial: { snapshot in
+                    guard partialPublishGate.shouldPublish() else { return }
+                    Task { @MainActor [weak self] in
+                        self?.publishChartChildMap(snapshot)
+                    }
+                },
+                chartChildren: { entries in
+                    await MainActor.run { [weak self] in
+                        self?.chartChildren(from: entries) ?? []
                     }
                 }
             )
 
             guard !Task.isCancelled else { return }
-
-            let finalMap = ChartTreeBuilder.childMap(
-                from: buildResult,
-                root: root,
-                listedEntries: context.listedEntries,
-                maxChildrenPerNode: maxChildrenPerNode
-            )
-
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.isChartChildrenLoading = false
@@ -148,9 +139,25 @@ extension DiskBrowserViewModel {
         }
     }
 
-    private var chartTreeMaxDepth: Int {
-        interfaceMode == .simple
-            ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
-            : SunburstLayoutEngine.Config.standard.maxDepth
+    private func seededChartChildEntries(for parents: [DiskItem]) -> [String: [DiskItem]] {
+        guard let currentPath, !entries.isEmpty else { return [:] }
+
+        let currentFolderPath = PathUtils.resolved(currentPath).path
+        let currentChildren = chartChildren(from: entries)
+        guard !currentChildren.isEmpty else { return [:] }
+
+        var seeded: [String: [DiskItem]] = [:]
+
+        for parent in parents {
+            let parentPath = PathUtils.resolved(parent.url).path
+            guard parentPath == currentFolderPath else { continue }
+            seeded[parentPath] = currentChildren
+        }
+
+        if seeded[currentFolderPath] == nil {
+            seeded[currentFolderPath] = currentChildren
+        }
+
+        return seeded
     }
 }

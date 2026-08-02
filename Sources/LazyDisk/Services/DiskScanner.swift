@@ -55,18 +55,13 @@ actor DiskScanner {
         let directoryItems = items.filter { $0.isDirectory && !$0.isVirtual }
 
         if let resolvedParent, !directoryItems.isEmpty {
-            final class PartialHolder: @unchecked Sendable {
-                var items: [DiskItem]
-                init(_ items: [DiskItem]) { self.items = items }
-            }
-            let partialHolder = PartialHolder(items)
+            var latestPartial = items
             let sized = await applySinglePassSizes(
                 parent: resolvedParent,
                 items: items,
                 configuration: onProgress == nil ? .fastSizing : .default,
                 onPartial: { walk in
-                    partialHolder.items = DirectorySizeWalker.applyPartialSizes(to: items, walkResult: walk)
-                    let latestPartial = partialHolder.items
+                    latestPartial = DirectorySizeWalker.applyPartialSizes(to: items, walkResult: walk)
                     guard let onProgress else { return }
 
                     let directoriesResolved = latestPartial.filter {

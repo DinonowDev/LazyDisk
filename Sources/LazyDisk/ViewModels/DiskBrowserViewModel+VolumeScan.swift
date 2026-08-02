@@ -55,7 +55,6 @@ extension DiskBrowserViewModel {
 
             guard !Task.isCancelled else { return }
 
-            await prefetchSidebarFirstLevel(volume: volume)
             startSmartPrefetch()
             startSearchIndexBuild()
             saveScanSnapshot(volume: volume)
