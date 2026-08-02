@@ -41,7 +41,6 @@ final class DirectorySizeWalkerTests: XCTestCase {
     }
 
     func testApplySizesUpdatesDirectoriesOnly() {
-        let root = URL(fileURLWithPath: "/tmp/root", isDirectory: true)
         let child = URL(fileURLWithPath: "/tmp/root/child", isDirectory: true)
         let file = URL(fileURLWithPath: "/tmp/root/readme.txt")
 

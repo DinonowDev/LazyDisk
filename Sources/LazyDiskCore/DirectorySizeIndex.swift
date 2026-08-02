@@ -1,5 +1,4 @@
 import Foundation
-import LazyDiskCore
 
 /// Shared size cache and coordinated subtree walks (dedupes concurrent requests).
 public actor DirectorySizeIndex {

@@ -157,7 +157,7 @@ extension DiskBrowserViewModel {
 
         let volumeID = selectedVolume?.id
 
-        prefetchTask = Task.detached(priority: .utility) { [weak viewModel = self] in
+        prefetchTask = Task.detached(priority: .utility) { [weak self] in
             let total = directories.count
             for (index, item) in directories.enumerated() {
                 guard !Task.isCancelled else { return }
@@ -190,13 +190,13 @@ extension DiskBrowserViewModel {
 
                 let folderName = item.name
                 let prefetchIndex = index
-                await MainActor.run {
-                    guard let viewModel, !Task.isCancelled else { return }
-                    if viewModel.appPhase == .scanning {
-                        let fraction = 0.92 + (Double(prefetchIndex + 1) / Double(max(total, 1))) * 0.08
-                        viewModel.scanProgressFraction = fraction
-                        viewModel.scanCurrentFolder = folderName
-                        viewModel.scanProgress = L10n.scanCachingFolders(prefetchIndex + 1, total)
+                await MainActor.run { [weak self] in
+                    guard let self, !Task.isCancelled else { return }
+                    if self.appPhase == .scanning {
+                        let prefetchFraction = 0.92 + (Double(prefetchIndex) + 0.4) / Double(max(total, 1)) * 0.08
+                        self.scanProgressFraction = max(self.scanProgressFraction, prefetchFraction)
+                        self.scanCurrentFolder = folderName
+                        self.scanProgress = L10n.scanCachingFolders(prefetchIndex + 1, total)
                     }
                 }
             }

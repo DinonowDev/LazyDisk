@@ -55,21 +55,42 @@ actor DiskScanner {
         let directoryItems = items.filter { $0.isDirectory && !$0.isVirtual }
 
         if let resolvedParent, !directoryItems.isEmpty {
-            var working = items
+            var latestPartial = items
             let sized = await applySinglePassSizes(
                 parent: resolvedParent,
-                items: working,
+                items: items,
+                configuration: onProgress == nil ? .fastSizing : .default,
                 onPartial: { walk in
+                    latestPartial = DirectorySizeWalker.applyPartialSizes(to: items, walkResult: walk)
                     guard let onProgress else { return }
-                    working = DirectorySizeWalker.applyPartialSizes(to: working, walkResult: walk)
-                    for (index, item) in working.enumerated() where item.isDirectory && !item.isVirtual {
-                        guard !item.isScanning else { continue }
+
+                    let directoriesResolved = latestPartial.filter {
+                        $0.isDirectory && !$0.isVirtual && !$0.isScanning
+                    }.count
+
+                    let currentName = latestPartial
+                        .filter { $0.isDirectory && !$0.isVirtual && !$0.isScanning }
+                        .max(by: { $0.size < $1.size })?
+                        .name ?? resolvedParent.lastPathComponent
+
+                    onProgress(ScanProgressUpdate(
+                        completed: directoriesResolved,
+                        total: max(directoryItems.count, 1),
+                        currentName: currentName,
+                        filesScanned: walk.filesScanned,
+                        directoriesResolved: directoriesResolved
+                    ))
+
+                    for (index, item) in latestPartial.enumerated()
+                        where item.isDirectory && !item.isVirtual && !item.isScanning {
                         onProgress(ScanProgressUpdate(
-                            completed: 0,
+                            completed: directoriesResolved,
                             total: max(directoryItems.count, 1),
                             currentName: item.name,
                             itemIndex: index,
-                            itemSize: item.size
+                            itemSize: item.size,
+                            filesScanned: walk.filesScanned,
+                            directoriesResolved: directoriesResolved
                         ))
                     }
                 }

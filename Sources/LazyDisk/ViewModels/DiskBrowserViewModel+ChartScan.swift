@@ -1,5 +1,6 @@
 // DiskBrowserViewModel+ChartScan.swift — Fast parallel chart child discovery for sunburst/treemap.
 import Foundation
+import LazyDiskCore
 
 private final class PartialPublishGate: @unchecked Sendable {
     private var lastPublishNanos: UInt64 = 0
@@ -37,31 +38,50 @@ extension DiskBrowserViewModel {
         let maxDepth = interfaceMode == .simple
             ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
             : SunburstLayoutEngine.Config.standard.maxDepth
+        let maxChildrenPerNode = interfaceMode == .simple ? 12 : 8
         let seededMap = seededChartChildEntries(for: parents)
         let parallelism = AppPreferences.load().scanParallelism
+        let volumeID = selectedVolume?.id
 
-        isChartChildrenLoading = true
-        chartChildrenScanProgress = ChartChildrenScanProgress(
-            completedFolders: seededMap.count,
-            totalFolders: max(parents.count, seededMap.count),
-            currentFolderName: "",
-            currentDepth: 1,
-            maxDepth: maxDepth + 1
+        let estimatedTotal = ChartWorkloadEstimator.estimateTotalFolders(
+            rootFolderCount: parents.count,
+            maxDepth: maxDepth,
+            maxChildrenPerNode: maxChildrenPerNode
         )
 
-        if !seededMap.isEmpty {
-            publishChartChildMap(seededMap)
-        }
+        isChartChildrenLoading = true
 
         chartChildRefreshTask = Task.detached(priority: .utility) { [weak self] in
             try? await Task.sleep(nanoseconds: 16_000_000)
             guard !Task.isCancelled else { return }
 
+            var restoredFraction: Double = 0
+            if let volumeID {
+                let restored = await PersistentChartScanProgressStore.shared.load(volumeID: volumeID)
+                restoredFraction = restored?.displayFraction ?? 0
+            }
+
+            await MainActor.run { [weak self] in
+                self?.chartChildrenScanProgress = ChartChildrenScanProgress(
+                    completedFolders: seededMap.count,
+                    totalFolders: max(estimatedTotal, seededMap.count),
+                    currentFolderName: "",
+                    currentDepth: 1,
+                    maxDepth: maxDepth + 1,
+                    displayFraction: restoredFraction
+                )
+                if !seededMap.isEmpty {
+                    self?.publishChartChildMap(seededMap)
+                }
+            }
+
             let request = ChartScanEngine.Request(
                 parents: parents,
                 maxDepth: maxDepth,
                 parallelism: parallelism,
-                seededEntriesByParentPath: seededMap
+                maxChildrenPerNode: maxChildrenPerNode,
+                seededEntriesByParentPath: seededMap,
+                restoredDisplayFraction: restoredFraction
             )
 
             let partialPublishGate = PartialPublishGate()
@@ -70,8 +90,24 @@ extension DiskBrowserViewModel {
                 request: request,
                 isCancelled: { Task.isCancelled },
                 onProgress: { progress in
+                    if let volumeID {
+                        Task {
+                            await PersistentChartScanProgressStore.shared.scheduleSave(
+                                volumeID: volumeID,
+                                displayFraction: progress.displayFraction,
+                                completedFolders: progress.completedFolders,
+                                estimatedTotalFolders: progress.totalFolders
+                            )
+                        }
+                    }
+
                     Task { @MainActor [weak self] in
-                        self?.chartChildrenScanProgress = progress
+                        guard let self else { return }
+                        if let current = self.chartChildrenScanProgress {
+                            self.chartChildrenScanProgress = current.advancing(to: progress)
+                        } else {
+                            self.chartChildrenScanProgress = progress
+                        }
                     }
                 },
                 onPartial: { snapshot in

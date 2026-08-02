@@ -41,6 +41,7 @@ extension DiskBrowserViewModel {
         scanTask = Task {
             await cache.clear()
             await SizeIndexCoordinator.shared.clear(volumeID: volume.id)
+            await PersistentChartScanProgressStore.shared.clear(volumeID: volume.id)
             await scanner.clearSizeCache()
             if let volume = selectedVolume {
                 await globalSearch.invalidateIndex(for: volume)
@@ -90,6 +91,7 @@ extension DiskBrowserViewModel {
         scanTask = Task {
             await cache.clear()
             await SizeIndexCoordinator.shared.clear(volumeID: volume.id)
+            await PersistentChartScanProgressStore.shared.clear(volumeID: volume.id)
             await scanner.clearSizeCache()
             if let volume = selectedVolume {
                 await globalSearch.invalidateIndex(for: volume)

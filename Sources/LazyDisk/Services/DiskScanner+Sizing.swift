@@ -9,9 +9,10 @@ extension DiskScanner {
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
     ) async -> [DiskItem] {
+        let effectiveConfiguration = onPartial == nil ? .fastSizing : configuration
         let walk = await childWalk(
             for: parent,
-            configuration: configuration,
+            configuration: effectiveConfiguration,
             shouldCancel: shouldCancel,
             onPartial: onPartial
         )

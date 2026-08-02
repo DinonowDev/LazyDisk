@@ -18,8 +18,9 @@ public enum DirectorySizeWalker {
         public var skipHiddenFiles: Bool
         public var partialUpdateInterval: Int
 
-        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 192)
-        public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96)
+        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 320)
+        public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 40)
+        public static let fastSizing = Configuration(skipHiddenFiles: true, partialUpdateInterval: 512)
 
         public init(skipHiddenFiles: Bool, partialUpdateInterval: Int) {
             self.skipHiddenFiles = skipHiddenFiles
@@ -28,10 +29,9 @@ public enum DirectorySizeWalker {
     }
 
     private static let sizeKeys: [URLResourceKey] = [
-        .fileSizeKey,
         .totalFileAllocatedSizeKey,
-        .isDirectoryKey,
-        .isHiddenKey
+        .fileSizeKey,
+        .isRegularFileKey
     ]
 
     public static func immediateChildSizes(
@@ -64,6 +64,7 @@ public enum DirectorySizeWalker {
         }
 
         let partialInterval = configuration.partialUpdateInterval
+        let tracksPartial = onPartial != nil
 
         func snapshot() -> WalkResult {
             WalkResult(childSizesByPath: childSizes, totalSize: total, filesScanned: filesScanned)
@@ -72,41 +73,45 @@ public enum DirectorySizeWalker {
         for case let fileURL as URL in enumerator {
             if let shouldCancel, shouldCancel() { break }
 
-            guard let values = try? fileURL.resourceValues(forKeys: Set(sizeKeys)) else { continue }
-            if values.isDirectory == true { continue }
+            autoreleasepool {
+                guard let values = try? fileURL.resourceValues(forKeys: Set(sizeKeys)) else { return }
+                guard values.isRegularFile == true else { return }
 
-            let allocated = Int64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
-            guard allocated > 0 else { continue }
+                let allocated = Int64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
+                guard allocated > 0 else { return }
 
-            total += allocated
-            filesScanned += 1
+                total += allocated
+                filesScanned += 1
 
-            let filePath = fileURL.standardizedFileURL.path
-            guard filePath.hasPrefix(prefix) else { continue }
+                let filePath = fileURL.standardizedFileURL.path
+                guard filePath.hasPrefix(prefix) else { return }
 
-            let relativeStart = filePath.index(filePath.startIndex, offsetBy: prefixLength)
-            guard relativeStart < filePath.endIndex else { continue }
+                let relativeStart = filePath.index(filePath.startIndex, offsetBy: prefixLength)
+                guard relativeStart < filePath.endIndex else { return }
 
-            let relative = filePath[relativeStart...]
-            if let slash = relative.firstIndex(of: "/") {
-                let childPath = prefix + relative[..<slash]
-                childSizes[childPath, default: 0] += allocated
-            } else {
-                childSizes[filePath, default: 0] += allocated
-            }
+                let relative = filePath[relativeStart...]
+                if let slash = relative.firstIndex(of: "/") {
+                    let childPath = prefix + relative[..<slash]
+                    childSizes[childPath, default: 0] += allocated
+                } else {
+                    childSizes[filePath, default: 0] += allocated
+                }
 
-            if let onPartial, filesScanned % partialInterval == 0 {
-                onPartial(snapshot())
+                if tracksPartial, filesScanned % partialInterval == 0 {
+                    onPartial?(snapshot())
+                }
             }
         }
 
         let result = snapshot()
-        onPartial?(result)
+        if tracksPartial {
+            onPartial?(result)
+        }
         return result
     }
 
     public static func totalSize(of directory: URL) -> Int64 {
-        immediateChildSizes(at: directory).totalSize
+        immediateChildSizes(at: directory, configuration: .fastSizing).totalSize
     }
 
     public static func applySizes(

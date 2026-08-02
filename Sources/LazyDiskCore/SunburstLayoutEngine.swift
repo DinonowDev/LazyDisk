@@ -57,7 +57,7 @@ public enum SunburstLayoutEngine {
 
         public static let daisyDisk = Config(
             hubRadius: 0.14,
-            maxOuterRadius: 0.47,
+            maxOuterRadius: 0.38,
             gapDegrees: 0.6,
             maxChildrenPerNode: 12,
             maxDepth: 4,

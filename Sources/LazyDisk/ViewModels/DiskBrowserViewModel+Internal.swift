@@ -20,7 +20,12 @@ extension DiskBrowserViewModel {
             guard generation == nil || generation == self.navigationGeneration else { return }
 
             if trackDetailedProgress {
-                self.scanProgressFraction = 0.1 + update.fraction * 0.75
+                let sizing = update.sizingFraction
+                self.scanProgressFraction = ScanProgressMath.volumeScanDisplayFraction(
+                    phaseBase: 0.1,
+                    sizingFraction: sizing,
+                    published: self.scanProgressFraction
+                )
                 self.scanCurrentFolder = update.currentName
                 self.scanProgress = L10n.scanFoldersProgress(update.completed, update.total)
             }
