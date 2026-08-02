@@ -36,11 +36,7 @@ extension FolderSidebarView {
                             )
                         }
                         .onHover { hovering in
-                            if hovering {
-                                viewModel.setHoveredID(item.id, keyboardIndex: index)
-                            } else {
-                                viewModel.setHoveredID(nil)
-                            }
+                            viewModel.setHoveredID(hovering ? item.id : nil)
                         }
                         .contextMenu { itemContextMenu(item) }
                     }
