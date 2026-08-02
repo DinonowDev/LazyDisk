@@ -18,7 +18,7 @@ enum FinderIntegration {
 }
 
 @objc(FinderServicesProvider)
-final class FinderServicesProvider: NSObject {
+final class FinderServicesProvider: NSObject, @unchecked Sendable {
   static let shared = FinderServicesProvider()
 
   @objc func analyzeWithLazyDisk(_ pboard: NSPasteboard, userData: String, error: NSErrorPointer) {
