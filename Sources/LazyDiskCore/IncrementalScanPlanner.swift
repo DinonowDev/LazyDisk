@@ -66,6 +66,8 @@ public enum IncrementalScanPlanner {
 
     private static func entryUnchanged(listed: DiskItem, cached: DiskItem) -> Bool {
         if listed.isDirectory {
+            // Directories with no cached size were never sized — must rescan.
+            guard cached.size > 0, !cached.isScanning else { return false }
             return datesMatch(listed.modifiedDate, cached.modifiedDate)
         }
 

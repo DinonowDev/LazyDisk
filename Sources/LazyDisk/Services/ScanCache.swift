@@ -54,9 +54,11 @@ actor ScanCache {
         isVolumeRoot: Bool,
         contentLevel: ScanContentLevel = .full
     ) async {
+        // Virtual reconcile items (System/Unscanned, purgeable, etc.) are display-only.
+        let persistable = entries.filter { !$0.isVirtual }
         let cached = CachedDirectory(
             url: url,
-            entries: entries,
+            entries: persistable,
             scannedAt: Date(),
             isVolumeRoot: isVolumeRoot,
             contentLevel: contentLevel
@@ -92,7 +94,16 @@ actor ScanCache {
     }
 
     func isComplete(_ cached: CachedDirectory) -> Bool {
-        !cached.entries.contains(where: \.isScanning)
+        guard !cached.entries.contains(where: \.isScanning) else { return false }
+        guard !cached.entries.contains(where: \.isVirtual) else { return false }
+
+        if cached.isVolumeRoot {
+            let directories = cached.entries.filter { $0.isDirectory && !$0.isVirtual }
+            guard !directories.isEmpty else { return false }
+            guard directories.contains(where: { $0.size > 0 }) else { return false }
+        }
+
+        return true
     }
 
     func needsFullMetadata(_ cached: CachedDirectory) -> Bool {

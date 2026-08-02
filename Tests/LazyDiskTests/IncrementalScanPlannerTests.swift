@@ -89,4 +89,33 @@ final class IncrementalScanPlannerTests: XCTestCase {
         XCTAssertEqual(plan.directoriesToRescan.map(\.path), [added.path])
         XCTAssertEqual(plan.mergedEntries.first(where: { $0.url == existing })?.size, 500)
     }
+
+    func testRescansDirectoryWithZeroCachedSize() {
+        let dir = URL(fileURLWithPath: "/tmp/unsized", isDirectory: true)
+        let unchangedDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let listed = [
+            DiskItem(
+                url: dir,
+                isDirectory: true,
+                isScanning: true,
+                modifiedDate: unchangedDate
+            )
+        ]
+        let cached = [
+            DiskItem(
+                url: dir,
+                size: 0,
+                isDirectory: true,
+                isScanning: false,
+                modifiedDate: unchangedDate
+            )
+        ]
+
+        let plan = IncrementalScanPlanner.plan(listed: listed, cached: cached)
+
+        XCTAssertEqual(plan.directoriesToRescan.map(\.path), [dir.path])
+        XCTAssertTrue(plan.mergedEntries[0].isScanning)
+        XCTAssertEqual(plan.mergedEntries[0].size, 0)
+    }
 }

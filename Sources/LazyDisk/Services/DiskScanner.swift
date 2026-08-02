@@ -126,7 +126,7 @@ actor DiskScanner {
     ) -> [DiskItem] {
         guard atVolumeRoot else { return items }
 
-        var result = items
+        var result = items.filter { !$0.isVirtual }
         let scannedTotal = result.reduce(Int64(0)) { $0 + $1.size }
         let purgeable = max(volume.purgeableCapacity, 0)
         let residual = volume.usedCapacity - scannedTotal - purgeable
