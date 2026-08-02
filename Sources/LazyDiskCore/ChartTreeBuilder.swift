@@ -76,7 +76,7 @@ public enum ChartTreeBuilder {
         public static let chartPreview = BuildOptions()
     }
 
-    public static let defaultMaxDepth = 3
+    public static let defaultMaxDepth = 4
 
     private static let sizeKeys: [URLResourceKey] = [
         .totalFileAllocatedSizeKey,

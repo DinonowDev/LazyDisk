@@ -55,7 +55,7 @@ final class SunburstLayoutTests: XCTestCase {
         XCTAssertLessThanOrEqual(childSeg.endAngle, parentSeg.endAngle)
     }
 
-    func testLargerSiblingHasGreaterRadialExtent() {
+    func testSiblingsShareFixedRingHeight() {
         let large = DiskItem(url: URL(fileURLWithPath: "/Large"), size: 80, isDirectory: true)
         let small = DiskItem(url: URL(fileURLWithPath: "/Small"), size: 20, isDirectory: true)
         let segments = SunburstLayoutEngine.build(
@@ -67,11 +67,12 @@ final class SunburstLayoutTests: XCTestCase {
               let smallSeg = segments.first(where: { $0.item.id == small.id }) else {
             return XCTFail("Missing segments")
         }
-        XCTAssertGreaterThan(largeSeg.outerRadiusRatio, smallSeg.outerRadiusRatio)
+        XCTAssertEqual(largeSeg.outerRadiusRatio, smallSeg.outerRadiusRatio, accuracy: 0.001)
+        XCTAssertEqual(largeSeg.innerRadiusRatio, smallSeg.innerRadiusRatio, accuracy: 0.001)
         XCTAssertGreaterThan(largeSeg.spanAngle, smallSeg.spanAngle)
     }
 
-    func testChildStartsAtParentOuterRadius() {
+    func testChildrenAddOuterRing() {
         let parent = DiskItem(url: URL(fileURLWithPath: "/A"), size: 100, isDirectory: true)
         let child = DiskItem(url: URL(fileURLWithPath: "/A/child"), size: 40, isDirectory: false)
         let segments = SunburstLayoutEngine.build(
@@ -83,7 +84,8 @@ final class SunburstLayoutTests: XCTestCase {
               let childSeg = segments.first(where: { $0.depth == 1 }) else {
             return XCTFail("Missing segments")
         }
-        XCTAssertGreaterThan(childSeg.innerRadiusRatio, parentSeg.outerRadiusRatio)
+        XCTAssertGreaterThan(childSeg.outerRadiusRatio, parentSeg.outerRadiusRatio)
+        XCTAssertGreaterThan(childSeg.innerRadiusRatio, parentSeg.innerRadiusRatio)
     }
 
     func testChildrenInheritParentHue() {
@@ -128,5 +130,23 @@ final class SunburstLayoutTests: XCTestCase {
         XCTAssertGreaterThan(childSeg.brightness, parentSeg.brightness)
         XCTAssertGreaterThan(grandchildSeg.brightness, childSeg.brightness)
         XCTAssertLessThan(childSeg.saturation, parentSeg.saturation)
+    }
+
+    func testBranchWithChildrenExtendsFurtherOut() {
+        let withChild = DiskItem(url: URL(fileURLWithPath: "/A"), size: 80, isDirectory: true)
+        let withoutChild = DiskItem(url: URL(fileURLWithPath: "/B"), size: 20, isDirectory: true)
+        let child = DiskItem(url: URL(fileURLWithPath: "/A/child"), size: 30, isDirectory: false)
+        let segments = SunburstLayoutEngine.build(
+            items: [withChild, withoutChild],
+            totalSize: 100,
+            childrenByParentPath: [PathUtils.resolved(withChild.url).path: [child]]
+        )
+        guard let parentA = segments.first(where: { $0.item.id == withChild.id && $0.depth == 0 }),
+              let parentB = segments.first(where: { $0.item.id == withoutChild.id }),
+              let childSeg = segments.first(where: { $0.depth == 1 }) else {
+            return XCTFail("Missing segments")
+        }
+        XCTAssertEqual(parentA.outerRadiusRatio, parentB.outerRadiusRatio, accuracy: 0.001)
+        XCTAssertGreaterThan(childSeg.outerRadiusRatio, parentA.outerRadiusRatio)
     }
 }

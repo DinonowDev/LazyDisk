@@ -98,4 +98,94 @@ extension DiskScanner {
             }
         }
     }
+
+    struct FusedVolumeRootScanResult: Sendable {
+        let items: [DiskItem]
+        let chartResult: ChartTreeBuilder.BuildResult?
+    }
+
+    func fusedVolumeRootScan(
+        parent: URL,
+        items: [DiskItem],
+        chartMaxDepth: Int,
+        skipHiddenFiles: Bool,
+        parallelism: Int,
+        configuration: DirectorySizeWalker.Configuration,
+        onProgress: (@Sendable (ScanProgressUpdate) -> Void)? = nil
+    ) async -> FusedVolumeRootScanResult {
+        let normalized = PathUtils.resolved(parent)
+        let directoryItems = items.filter { $0.isDirectory && !$0.isVirtual }
+
+        guard NativeDirectoryScanner.isAvailable,
+              let fused = NativeDirectoryScanner.fusedVolumeScan(
+                  at: normalized,
+                  listedEntries: items,
+                  maxDepth: chartMaxDepth,
+                  skipHiddenFiles: skipHiddenFiles,
+                  parallelism: parallelism,
+                  onPartial: { partial in
+                      guard let onProgress else { return }
+                      let walk = Self.sizingWalk(from: partial, items: items)
+                      let partialItems = DirectorySizeWalker.applyPartialSizes(to: items, walkResult: walk)
+                      let directoriesResolved = partialItems.filter {
+                          $0.isDirectory && !$0.isVirtual && !$0.isScanning
+                      }.count
+                      let currentName = partialItems
+                          .filter { $0.isDirectory && !$0.isVirtual && !$0.isScanning }
+                          .max(by: { $0.size < $1.size })?
+                          .name ?? normalized.lastPathComponent
+                      onProgress(ScanProgressUpdate(
+                          completed: directoriesResolved,
+                          total: max(directoryItems.count, 1),
+                          currentName: currentName,
+                          filesScanned: partial.filesScanned,
+                          directoriesResolved: directoriesResolved,
+                          partialEntries: partialItems
+                      ))
+                  }
+              ) else {
+            let sized = await scanDirectorySizes(
+                items: items,
+                parent: normalized,
+                configuration: configuration,
+                parallelism: parallelism,
+                onProgress: onProgress
+            )
+            return FusedVolumeRootScanResult(items: sized, chartResult: nil)
+        }
+
+        await DirectorySizeIndex.shared.store(fused.sizingWalk, forRoot: normalized.path)
+        let sized = DirectorySizeWalker.applySizes(to: items, walkResult: fused.sizingWalk)
+
+        if let onProgress {
+            onProgress(ScanProgressUpdate(
+                completed: directoryItems.count,
+                total: max(directoryItems.count, 1),
+                currentName: normalized.lastPathComponent,
+                partialEntries: sized
+            ))
+        }
+
+        return FusedVolumeRootScanResult(items: sized, chartResult: fused.chartResult)
+    }
+
+    private static func sizingWalk(
+        from chartPartial: ChartTreeBuilder.BuildResult,
+        items: [DiskItem]
+    ) -> DirectorySizeWalker.WalkResult {
+        var childSizesByPath: [String: Int64] = [:]
+        for entry in items where !entry.isVirtual {
+            let path = PathUtils.resolved(entry.url).path
+            if let size = chartPartial.statsByPath[path]?.size, size > 0 {
+                childSizesByPath[path] = size
+            } else if entry.size > 0 {
+                childSizesByPath[path] = entry.size
+            }
+        }
+        return DirectorySizeWalker.WalkResult(
+            childSizesByPath: childSizesByPath,
+            totalSize: chartPartial.totalSize,
+            filesScanned: chartPartial.filesScanned
+        )
+    }
 }

@@ -42,19 +42,49 @@ extension DiskBrowserViewModel {
 
         let prefs = AppPreferences.load()
         let sizingConfiguration = prefs.sizingConfiguration()
+        let parallelism = prefs.scanParallelism
+        let useFusedVolumeScan = isVolumeRoot && trackDetailedProgress && chartStyle == .sunburst
 
-        let scanned = await scanner.scanDirectorySizes(
-            items: listed,
-            parent: normalized,
-            configuration: sizingConfiguration,
-            parallelism: AppPreferences.load().scanParallelism
-        ) { [weak self] update in
-            DispatchQueue.main.async {
-                self?.publishScanProgress(
-                    update,
-                    trackDetailedProgress: trackDetailedProgress,
-                    generation: generation
-                )
+        let scanned: [DiskItem]
+        var fusedChartResult: ChartTreeBuilder.BuildResult?
+
+        if useFusedVolumeScan {
+            let chartDepth = interfaceMode == .simple
+                ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
+                : SunburstLayoutEngine.Config.standard.maxDepth
+            let fused = await scanner.fusedVolumeRootScan(
+                parent: normalized,
+                items: listed,
+                chartMaxDepth: chartDepth,
+                skipHiddenFiles: !prefs.showHiddenFiles,
+                parallelism: parallelism,
+                configuration: sizingConfiguration,
+                onProgress: { [weak self] update in
+                    DispatchQueue.main.async {
+                        self?.publishScanProgress(
+                            update,
+                            trackDetailedProgress: trackDetailedProgress,
+                            generation: generation
+                        )
+                    }
+                }
+            )
+            scanned = fused.items
+            fusedChartResult = fused.chartResult
+        } else {
+            scanned = await scanner.scanDirectorySizes(
+                items: listed,
+                parent: normalized,
+                configuration: sizingConfiguration,
+                parallelism: parallelism
+            ) { [weak self] update in
+                DispatchQueue.main.async {
+                    self?.publishScanProgress(
+                        update,
+                        trackDetailedProgress: trackDetailedProgress,
+                        generation: generation
+                    )
+                }
             }
         }
         guard !Task.isCancelled, generation == nil || generation == navigationGeneration else { return }
@@ -79,7 +109,9 @@ extension DiskBrowserViewModel {
 
         entries = sorted
         invalidateAllDerivedCaches()
-        if isVolumeRoot && trackDetailedProgress {
+        if let fusedChartResult {
+            applyFusedChartFromVolumeScan(fusedChartResult, root: normalized, listedEntries: sorted)
+        } else if isVolumeRoot && trackDetailedProgress {
             refreshChartChildrenIfNeeded()
         }
         await cache.set(

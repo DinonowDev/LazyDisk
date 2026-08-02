@@ -17,9 +17,11 @@
 #define LDFS_PARTIAL_INTERVAL 96
 #define LDFS_INODE_BUCKETS 65536
 #define LDFS_PATH_BUCKETS 262144
+#define LDFS_NO_INDEX ((size_t)-1)
 
 typedef struct {
     char *path;
+    int dirfd;
 } ldfs_queue_item;
 
 typedef struct {
@@ -27,7 +29,10 @@ typedef struct {
     size_t head;
     size_t tail;
     size_t capacity;
+    size_t inflight;
+    int closed;
     pthread_mutex_t lock;
+    pthread_cond_t cond;
 } ldfs_work_queue;
 
 typedef struct {
@@ -40,13 +45,14 @@ typedef struct {
     int64_t size;
     int32_t file_count;
     uint8_t is_directory;
+    size_t next_in_bucket;
 } ldfs_path_stat_node;
 
 typedef struct {
     ldfs_path_stat_node *nodes;
     size_t count;
     size_t capacity;
-    ldfs_path_stat_node **buckets;
+    size_t *bucket_heads;
     size_t bucket_count;
     pthread_mutex_t lock;
 } ldfs_path_stats;
@@ -73,8 +79,9 @@ typedef struct {
 
 void ldfs_work_queue_init(ldfs_work_queue *queue);
 void ldfs_work_queue_free(ldfs_work_queue *queue);
-int ldfs_work_queue_push(ldfs_work_queue *queue, const char *path);
-char *ldfs_work_queue_pop(ldfs_work_queue *queue);
+int ldfs_work_queue_push_fd(ldfs_work_queue *queue, const char *path, int dirfd);
+ldfs_queue_item ldfs_work_queue_pop_wait(ldfs_work_queue *queue);
+void ldfs_work_queue_finish_item(ldfs_work_queue *queue);
 size_t ldfs_work_queue_size(ldfs_work_queue *queue);
 
 ldfs_inode_hash *ldfs_inode_hash_create(void);
@@ -90,7 +97,7 @@ size_t ldfs_path_stats_export(ldfs_path_stats *stats, ldfs_path_stat **out);
 size_t ldfs_path_stats_snapshot(ldfs_path_stats *stats, ldfs_path_stat **out);
 
 int ldfs_match_child_index(const ldfs_child_entry *children, size_t child_count, const char *file_path);
-void ldfs_scan_directory(ldfs_walk_context *ctx, const char *dir_path);
+void ldfs_scan_directory_fd(ldfs_walk_context *ctx, const char *dir_path, int dirfd);
 void ldfs_run_workers(ldfs_walk_context *ctx, int worker_count, void (*worker_fn)(ldfs_walk_context *));
 void ldfs_worker_loop(ldfs_walk_context *ctx);
 

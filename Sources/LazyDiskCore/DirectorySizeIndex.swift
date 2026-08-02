@@ -112,6 +112,25 @@ public actor DirectorySizeIndex {
         }
     }
 
+    /// Invalidate and rerun a single native walk for one directory level.
+    public func rescanSubtree(
+        at url: URL,
+        listedChildren: [URL]? = nil,
+        configuration: DirectorySizeWalker.Configuration = .default,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
+    ) async -> DirectorySizeWalker.WalkResult {
+        let key = PathUtils.resolved(url).path
+        invalidate(prefix: key)
+        return await walk(
+            at: url,
+            listedChildren: listedChildren,
+            configuration: configuration,
+            shouldCancel: shouldCancel,
+            onPartial: onPartial
+        )
+    }
+
     public func clear() {
         for task in inflightWalks.values {
             task.cancel()

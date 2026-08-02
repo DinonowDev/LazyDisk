@@ -123,24 +123,18 @@ extension DiskBrowserViewModel {
 
         await cache.set(normalized, entries: merged, isVolumeRoot: isAtVolumeRoot, contentLevel: .full)
 
-        let indicesToRecalc = merged.enumerated().compactMap { index, item -> Int? in
-            guard item.isDirectory, !item.isVirtual else { return nil }
-            let dirPath = PathUtils.resolved(item.url).path
-            let affected = changedPaths.contains { changedPath in
-                changedPath == dirPath || changedPath.hasPrefix(dirPath + "/")
-            }
-            return affected ? index : nil
-        }
+        let prefs = AppPreferences.load()
+        let sizingConfiguration = prefs.sizingConfiguration(fast: true)
+        let directoryURLs = merged
+            .filter { $0.isDirectory && !$0.isVirtual }
+            .map(\.url)
 
-        var updatedEntries = merged
-        for index in indicesToRecalc {
-            guard index < updatedEntries.count else { continue }
-            let url = updatedEntries[index].url
-            let size = await scanner.calculateSize(for: url)
-            guard let idx = updatedEntries.firstIndex(where: { $0.url == url }) else { continue }
-            updatedEntries[idx].size = size
-            updatedEntries[idx].isScanning = false
-        }
+        let walk = await DirectorySizeIndex.shared.rescanSubtree(
+            at: normalized,
+            listedChildren: directoryURLs,
+            configuration: sizingConfiguration
+        )
+        var updatedEntries = DirectorySizeWalker.applySizes(to: merged, walkResult: walk)
 
         updatedEntries = sortOrder.sort(updatedEntries)
         if isAtVolumeRoot {

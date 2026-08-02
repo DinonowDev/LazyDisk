@@ -2,8 +2,10 @@
 #include "ldfs_internal.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 static int ldfs_run_walk(ldfs_walk_context *ctx, const char *root_path, bool turbo) {
     struct stat root_stat;
@@ -14,7 +16,12 @@ static int ldfs_run_walk(ldfs_walk_context *ctx, const char *root_path, bool tur
     }
     ctx->root_len = strlen(root_path);
 
-    if (ldfs_work_queue_push(ctx->queue, root_path) != 0) {
+    int root_fd = open(root_path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (root_fd < 0) {
+        return -errno;
+    }
+    if (ldfs_work_queue_push_fd(ctx->queue, root_path, root_fd) != 0) {
+        close(root_fd);
         return -ENOMEM;
     }
 

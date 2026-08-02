@@ -59,6 +59,13 @@ extension DiskBrowserViewModel {
             }
             guard let listedEntries else { return }
 
+            let topLevelDirs = Set(
+                listedEntries
+                    .filter { $0.isDirectory && !$0.isVirtual }
+                    .map { PathUtils.resolved($0.url).path }
+            )
+            let expandedParents = expandedParents.union(topLevelDirs)
+
             await MainActor.run { [weak self] in
                 self?.chartChildrenScanProgress = ChartChildrenScanProgress(
                     completedFolders: 0,
@@ -152,6 +159,24 @@ extension DiskBrowserViewModel {
         }
     }
 
+    func applyFusedChartFromVolumeScan(
+        _ buildResult: ChartTreeBuilder.BuildResult,
+        root: URL,
+        listedEntries: [DiskItem]
+    ) {
+        chartDeferredByParent = buildResult.deferredByParent
+        let map = ChartTreeBuilder.childMap(
+            from: buildResult,
+            root: root,
+            listedEntries: listedEntries,
+            maxChildrenPerNode: chartMaxChildrenPerNode,
+            otherItemName: L10n.filterOther
+        )
+        isChartChildrenLoading = false
+        chartChildrenScanProgress = nil
+        publishChartChildMap(map)
+    }
+
     func expandChartSubtreeOther(at parentPath: String) {
         guard chartExpandedOtherParents.insert(parentPath).inserted else { return }
         refreshChartChildren()
@@ -180,7 +205,11 @@ extension DiskBrowserViewModel {
         chartDeferredByParent.removeAll()
     }
 
-    private var chartTreeMaxDepth: Int { 3 }
+    private var chartTreeMaxDepth: Int {
+        interfaceMode == .simple
+            ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
+            : SunburstLayoutEngine.Config.standard.maxDepth
+    }
 
     private var chartMaxChildrenPerNode: Int {
         SunburstLayoutEngine.Config.daisyDisk.maxChildrenPerNode

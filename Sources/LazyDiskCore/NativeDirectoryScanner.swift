@@ -2,8 +2,8 @@ import Foundation
 import LazyDiskFS
 
 /// macOS-native directory sizing via getattrlistbulk (LazyDiskFS).
-enum NativeDirectoryScanner {
-    static var isAvailable: Bool { true }
+public enum NativeDirectoryScanner {
+    public static var isAvailable: Bool { true }
 
     private final class ScanBridge: @unchecked Sendable {
         let childEntries: ContiguousArray<ldfs_child_entry>
@@ -340,5 +340,44 @@ enum NativeDirectoryScanner {
             filesScanned: Int(filesScanned),
             deferredByParent: [:]
         )
+    }
+
+    public static func fusedVolumeScan(
+        at root: URL,
+        listedEntries: [DiskItem],
+        maxDepth: Int,
+        skipHiddenFiles: Bool,
+        parallelism: Int? = nil,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
+        onPartial: (@Sendable (ChartTreeBuilder.BuildResult) -> Void)? = nil
+    ) -> FusedNativeScanResult? {
+        guard let chartResult = buildChartTree(
+            at: root,
+            listedEntries: listedEntries,
+            maxDepth: maxDepth,
+            skipHiddenFiles: skipHiddenFiles,
+            parallelism: parallelism,
+            shouldCancel: shouldCancel,
+            onPartial: onPartial
+        ) else {
+            return nil
+        }
+
+        var childSizesByPath: [String: Int64] = [:]
+        for entry in listedEntries where !entry.isVirtual {
+            let path = PathUtils.resolved(entry.url).path
+            if let nodeStats = chartResult.statsByPath[path], nodeStats.size > 0 {
+                childSizesByPath[path] = nodeStats.size
+            } else if entry.size > 0 {
+                childSizesByPath[path] = entry.size
+            }
+        }
+
+        let sizingWalk = DirectorySizeWalker.WalkResult(
+            childSizesByPath: childSizesByPath,
+            totalSize: chartResult.totalSize,
+            filesScanned: chartResult.filesScanned
+        )
+        return FusedNativeScanResult(sizingWalk: sizingWalk, chartResult: chartResult)
     }
 }

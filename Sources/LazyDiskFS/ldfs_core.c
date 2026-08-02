@@ -17,15 +17,19 @@ static uint64_t ldfs_hash_string(const char *s) {
     return hash;
 }
 
-static ldfs_path_stat_node *ldfs_path_stats_find(
+static ldfs_path_stat_node *ldfs_path_stats_find_locked(
     ldfs_path_stats *stats,
     const char *path,
     bool create
 ) {
-    for (size_t i = 0; i < stats->count; i++) {
-        if (strcmp(stats->nodes[i].path, path) == 0) {
-            return &stats->nodes[i];
+    size_t bucket = (size_t)(ldfs_hash_string(path) % stats->bucket_count);
+    size_t idx = stats->bucket_heads[bucket];
+
+    while (idx != LDFS_NO_INDEX) {
+        if (strcmp(stats->nodes[idx].path, path) == 0) {
+            return &stats->nodes[idx];
         }
+        idx = stats->nodes[idx].next_in_bucket;
     }
 
     if (!create) {
@@ -42,7 +46,8 @@ static ldfs_path_stat_node *ldfs_path_stats_find(
         stats->capacity = new_cap;
     }
 
-    ldfs_path_stat_node *slot = &stats->nodes[stats->count];
+    size_t new_idx = stats->count;
+    ldfs_path_stat_node *slot = &stats->nodes[new_idx];
     slot->path = strdup(path);
     if (!slot->path) {
         return NULL;
@@ -50,6 +55,8 @@ static ldfs_path_stat_node *ldfs_path_stats_find(
     slot->size = 0;
     slot->file_count = 0;
     slot->is_directory = 0;
+    slot->next_in_bucket = stats->bucket_heads[bucket];
+    stats->bucket_heads[bucket] = new_idx;
     stats->count += 1;
     return slot;
 }
@@ -83,17 +90,24 @@ void ldfs_work_queue_init(ldfs_work_queue *queue) {
     queue->head = 0;
     queue->tail = 0;
     queue->capacity = 0;
+    queue->inflight = 0;
+    queue->closed = 0;
     pthread_mutex_init(&queue->lock, NULL);
+    pthread_cond_init(&queue->cond, NULL);
 }
 
 void ldfs_work_queue_free(ldfs_work_queue *queue) {
     if (queue->items) {
         for (size_t i = queue->head; i < queue->tail; i++) {
             free(queue->items[i].path);
+            if (queue->items[i].dirfd >= 0) {
+                close(queue->items[i].dirfd);
+            }
         }
     }
     free(queue->items);
     pthread_mutex_destroy(&queue->lock);
+    pthread_cond_destroy(&queue->cond);
 }
 
 static int ldfs_work_queue_grow(ldfs_work_queue *queue) {
@@ -116,7 +130,7 @@ static int ldfs_work_queue_grow(ldfs_work_queue *queue) {
     return 0;
 }
 
-int ldfs_work_queue_push(ldfs_work_queue *queue, const char *path) {
+int ldfs_work_queue_push_fd(ldfs_work_queue *queue, const char *path, int dirfd) {
     pthread_mutex_lock(&queue->lock);
     if (queue->tail - queue->head >= queue->capacity) {
         if (ldfs_work_queue_grow(queue) != 0) {
@@ -130,26 +144,48 @@ int ldfs_work_queue_push(ldfs_work_queue *queue, const char *path) {
         return -1;
     }
     queue->items[queue->tail].path = copy;
+    queue->items[queue->tail].dirfd = dirfd;
     queue->tail += 1;
+    pthread_cond_signal(&queue->cond);
     pthread_mutex_unlock(&queue->lock);
     return 0;
 }
 
-char *ldfs_work_queue_pop(ldfs_work_queue *queue) {
+ldfs_queue_item ldfs_work_queue_pop_wait(ldfs_work_queue *queue) {
+    ldfs_queue_item empty = {NULL, -1};
     pthread_mutex_lock(&queue->lock);
-    if (queue->head >= queue->tail) {
-        pthread_mutex_unlock(&queue->lock);
-        return NULL;
+    while (queue->head >= queue->tail) {
+        if (queue->closed) {
+            pthread_mutex_unlock(&queue->lock);
+            return empty;
+        }
+        pthread_cond_wait(&queue->cond, &queue->lock);
     }
-    char *path = queue->items[queue->head].path;
+    ldfs_queue_item item = queue->items[queue->head];
     queue->items[queue->head].path = NULL;
+    queue->items[queue->head].dirfd = -1;
     queue->head += 1;
     if (queue->head == queue->tail) {
         queue->head = 0;
         queue->tail = 0;
     }
+    queue->inflight += 1;
     pthread_mutex_unlock(&queue->lock);
-    return path;
+    return item;
+}
+
+void ldfs_work_queue_finish_item(ldfs_work_queue *queue) {
+    pthread_mutex_lock(&queue->lock);
+    if (queue->inflight > 0) {
+        queue->inflight -= 1;
+    }
+    if (queue->head >= queue->tail && queue->inflight == 0) {
+        queue->closed = 1;
+        pthread_cond_broadcast(&queue->cond);
+    } else if (queue->head < queue->tail) {
+        pthread_cond_signal(&queue->cond);
+    }
+    pthread_mutex_unlock(&queue->lock);
 }
 
 size_t ldfs_work_queue_size(ldfs_work_queue *queue) {
@@ -207,10 +243,13 @@ ldfs_path_stats *ldfs_path_stats_create(void) {
         return NULL;
     }
     stats->bucket_count = LDFS_PATH_BUCKETS;
-    stats->buckets = calloc(stats->bucket_count, sizeof(ldfs_path_stat_node *));
-    if (!stats->buckets) {
+    stats->bucket_heads = malloc(stats->bucket_count * sizeof(size_t));
+    if (!stats->bucket_heads) {
         free(stats);
         return NULL;
+    }
+    for (size_t i = 0; i < stats->bucket_count; i++) {
+        stats->bucket_heads[i] = LDFS_NO_INDEX;
     }
     pthread_mutex_init(&stats->lock, NULL);
     return stats;
@@ -224,14 +263,14 @@ void ldfs_path_stats_free(ldfs_path_stats *stats) {
         free(stats->nodes[i].path);
     }
     free(stats->nodes);
-    free(stats->buckets);
+    free(stats->bucket_heads);
     pthread_mutex_destroy(&stats->lock);
     free(stats);
 }
 
 void ldfs_path_stats_mark_directory(ldfs_path_stats *stats, const char *path) {
     pthread_mutex_lock(&stats->lock);
-    ldfs_path_stat_node *node = ldfs_path_stats_find(stats, path, true);
+    ldfs_path_stat_node *node = ldfs_path_stats_find_locked(stats, path, true);
     if (node) {
         node->is_directory = 1;
     }
@@ -243,7 +282,7 @@ void ldfs_path_stats_add_size(ldfs_path_stats *stats, const char *path, int64_t 
         return;
     }
     pthread_mutex_lock(&stats->lock);
-    ldfs_path_stat_node *node = ldfs_path_stats_find(stats, path, true);
+    ldfs_path_stat_node *node = ldfs_path_stats_find_locked(stats, path, true);
     if (node) {
         node->size += size;
     }
@@ -255,7 +294,7 @@ void ldfs_path_stats_add_file(ldfs_path_stats *stats, const char *parent_path, i
         return;
     }
     pthread_mutex_lock(&stats->lock);
-    ldfs_path_stat_node *node = ldfs_path_stats_find(stats, parent_path, true);
+    ldfs_path_stat_node *node = ldfs_path_stats_find_locked(stats, parent_path, true);
     if (node) {
         node->size += size;
         node->file_count += 1;
@@ -282,6 +321,9 @@ size_t ldfs_path_stats_export(ldfs_path_stats *stats, ldfs_path_stat **out) {
         stats->nodes[i].path = NULL;
     }
     stats->count = 0;
+    for (size_t i = 0; i < stats->bucket_count; i++) {
+        stats->bucket_heads[i] = LDFS_NO_INDEX;
+    }
     pthread_mutex_unlock(&stats->lock);
     *out = entries;
     return count;
@@ -468,14 +510,20 @@ static bool ldfs_is_hidden_name(const char *name) {
     return name[0] == '.';
 }
 
-void ldfs_scan_directory(ldfs_walk_context *ctx, const char *dir_path) {
+void ldfs_scan_directory_fd(ldfs_walk_context *ctx, const char *dir_path, int dirfd) {
     if (ldfs_is_cancelled(ctx)) {
+        if (dirfd >= 0) {
+            close(dirfd);
+        }
         return;
     }
 
-    int dirfd = open(dir_path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (dirfd < 0) {
-        return;
+    int owned_fd = dirfd;
+    if (owned_fd < 0) {
+        owned_fd = open(dir_path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (owned_fd < 0) {
+            return;
+        }
     }
 
     struct attrlist attr_list;
@@ -494,16 +542,18 @@ void ldfs_scan_directory(ldfs_walk_context *ctx, const char *dir_path) {
     size_t buffer_size = ldfs_effective_buffer_size(ctx->buffer_size);
     char *buffer = malloc(buffer_size);
     if (!buffer) {
-        close(dirfd);
+        close(owned_fd);
         return;
     }
+
+    size_t dir_len = strlen(dir_path);
 
     for (;;) {
         if (ldfs_is_cancelled(ctx)) {
             break;
         }
 
-        int retcount = getattrlistbulk(dirfd, &attr_list, buffer, buffer_size, 0);
+        int retcount = getattrlistbulk(owned_fd, &attr_list, buffer, buffer_size, 0);
         if (retcount < 0) {
             break;
         }
@@ -584,21 +634,30 @@ void ldfs_scan_directory(ldfs_walk_context *ctx, const char *dir_path) {
                 continue;
             }
 
-            char child_path[PATH_MAX];
-            size_t dir_len = strlen(dir_path);
-            if (dir_len + 1 + strlen(name) + 1 > PATH_MAX) {
+            size_t name_len = strlen(name);
+            if (dir_len + 1 + name_len + 1 > PATH_MAX) {
                 continue;
             }
-            snprintf(child_path, sizeof(child_path), "%s/%s", dir_path, name);
+
+            char child_path[PATH_MAX];
+            memcpy(child_path, dir_path, dir_len);
+            child_path[dir_len] = '/';
+            memcpy(child_path + dir_len + 1, name, name_len + 1);
 
             if (obj_type == VDIR) {
                 if (dev != 0 && dev != (uint32_t)ctx->root_dev) {
                     continue;
                 }
+                int subfd = openat(owned_fd, name, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+                if (subfd < 0) {
+                    continue;
+                }
                 if (ctx->stats) {
                     ldfs_path_stats_mark_directory(ctx->stats, child_path);
                 }
-                ldfs_work_queue_push(ctx->queue, child_path);
+                if (ldfs_work_queue_push_fd(ctx->queue, child_path, subfd) != 0) {
+                    close(subfd);
+                }
                 continue;
             }
 
@@ -611,7 +670,7 @@ void ldfs_scan_directory(ldfs_walk_context *ctx, const char *dir_path) {
     }
 
     free(buffer);
-    close(dirfd);
+    close(owned_fd);
 }
 
 static void *ldfs_worker_thread(void *arg) {
@@ -621,16 +680,13 @@ static void *ldfs_worker_thread(void *arg) {
 
 void ldfs_worker_loop(ldfs_walk_context *ctx) {
     for (;;) {
-        char *path = ldfs_work_queue_pop(ctx->queue);
-        if (!path) {
-            if (ldfs_work_queue_size(ctx->queue) == 0) {
-                break;
-            }
-            usleep(500);
-            continue;
+        ldfs_queue_item item = ldfs_work_queue_pop_wait(ctx->queue);
+        if (!item.path) {
+            break;
         }
-        ldfs_scan_directory(ctx, path);
-        free(path);
+        ldfs_scan_directory_fd(ctx, item.path, item.dirfd);
+        free(item.path);
+        ldfs_work_queue_finish_item(ctx->queue);
     }
 }
 
