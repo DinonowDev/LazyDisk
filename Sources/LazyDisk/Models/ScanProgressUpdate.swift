@@ -9,6 +9,7 @@ struct ScanProgressUpdate: Sendable {
     let itemSize: Int64?
     let filesScanned: Int?
     let directoriesResolved: Int?
+    let partialEntries: [DiskItem]?
 
     init(
         completed: Int,
@@ -17,7 +18,8 @@ struct ScanProgressUpdate: Sendable {
         itemIndex: Int? = nil,
         itemSize: Int64? = nil,
         filesScanned: Int? = nil,
-        directoriesResolved: Int? = nil
+        directoriesResolved: Int? = nil,
+        partialEntries: [DiskItem]? = nil
     ) {
         self.completed = completed
         self.total = total
@@ -26,6 +28,7 @@ struct ScanProgressUpdate: Sendable {
         self.itemSize = itemSize
         self.filesScanned = filesScanned
         self.directoriesResolved = directoriesResolved
+        self.partialEntries = partialEntries
     }
 
     var fraction: Double {
@@ -37,7 +40,8 @@ struct ScanProgressUpdate: Sendable {
         ScanProgressMath.volumeSizingFraction(
             directoriesResolved: directoriesResolved ?? completed,
             directoryTotal: total,
-            filesScanned: filesScanned ?? 0
+            filesScanned: filesScanned ?? 0,
+            entries: partialEntries ?? []
         )
     }
 }

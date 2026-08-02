@@ -60,4 +60,23 @@ final class DirectorySizeWalkerTests: XCTestCase {
         XCTAssertFalse(updated[0].isScanning)
         XCTAssertEqual(updated[1].size, 42)
     }
+
+    func testImmediateChildSizesUsesResolvedPathsForSymlinkedChildren() throws {
+        let dataVolume = tempRoot.appendingPathComponent("data-volume", isDirectory: true)
+        let users = dataVolume.appendingPathComponent("Users", isDirectory: true)
+        let usersLink = tempRoot.appendingPathComponent("Users", isDirectory: true)
+        try FileManager.default.createDirectory(at: users, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: usersLink, withDestinationURL: users)
+        try Data(count: 18_000).write(to: users.appendingPathComponent("profile.db"))
+
+        let listedChild = PathUtils.resolved(usersLink)
+        let items = [DiskItem(url: listedChild, isDirectory: true, isScanning: true)]
+
+        let walk = DirectorySizeWalker.immediateChildSizes(at: dataVolume)
+        let updated = DirectorySizeWalker.applySizes(to: items, walkResult: walk)
+
+        XCTAssertGreaterThan(walk.childSizesByPath[listedChild.path] ?? 0, 10_000)
+        XCTAssertEqual(updated[0].size, walk.childSizesByPath[listedChild.path])
+        XCTAssertFalse(updated[0].isScanning)
+    }
 }

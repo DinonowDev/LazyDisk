@@ -18,7 +18,7 @@ public enum DirectorySizeWalker {
         public var skipHiddenFiles: Bool
         public var partialUpdateInterval: Int
 
-        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 320)
+        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96)
         public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 40)
         public static let fastSizing = Configuration(skipHiddenFiles: true, partialUpdateInterval: 512)
 
@@ -70,6 +70,10 @@ public enum DirectorySizeWalker {
             WalkResult(childSizesByPath: childSizes, totalSize: total, filesScanned: filesScanned)
         }
 
+        if tracksPartial {
+            onPartial?(snapshot())
+        }
+
         for case let fileURL as URL in enumerator {
             if let shouldCancel, shouldCancel() { break }
 
@@ -83,7 +87,7 @@ public enum DirectorySizeWalker {
                 total += allocated
                 filesScanned += 1
 
-                let filePath = fileURL.standardizedFileURL.path
+                let filePath = PathUtils.resolved(fileURL).path
                 guard filePath.hasPrefix(prefix) else { return }
 
                 let relativeStart = filePath.index(filePath.startIndex, offsetBy: prefixLength)
@@ -91,7 +95,7 @@ public enum DirectorySizeWalker {
 
                 let relative = filePath[relativeStart...]
                 if let slash = relative.firstIndex(of: "/") {
-                    let childPath = prefix + relative[..<slash]
+                    let childPath = String(filePath[..<slash])
                     childSizes[childPath, default: 0] += allocated
                 } else {
                     childSizes[filePath, default: 0] += allocated
@@ -123,10 +127,8 @@ public enum DirectorySizeWalker {
 
             var updated = item
             let key = PathUtils.resolved(item.url).path
-            if let size = walkResult.childSizesByPath[key] {
-                updated.size = size
-                updated.isScanning = false
-            }
+            updated.size = walkResult.childSizesByPath[key] ?? 0
+            updated.isScanning = false
             return updated
         }
     }
@@ -149,7 +151,7 @@ public enum DirectorySizeWalker {
     }
 
     private static func directoryPath(_ url: URL) -> String {
-        var path = url.standardizedFileURL.path
+        var path = PathUtils.resolved(url).path
         if path.count > 1, path.hasSuffix("/") {
             path.removeLast()
         }

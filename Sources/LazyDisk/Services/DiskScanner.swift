@@ -78,7 +78,8 @@ actor DiskScanner {
                         total: max(directoryItems.count, 1),
                         currentName: currentName,
                         filesScanned: walk.filesScanned,
-                        directoriesResolved: directoriesResolved
+                        directoriesResolved: directoriesResolved,
+                        partialEntries: latestPartial
                     ))
 
                     for (index, item) in latestPartial.enumerated()
@@ -90,7 +91,8 @@ actor DiskScanner {
                             itemIndex: index,
                             itemSize: item.size,
                             filesScanned: walk.filesScanned,
-                            directoriesResolved: directoriesResolved
+                            directoriesResolved: directoriesResolved,
+                            partialEntries: latestPartial
                         ))
                     }
                 }

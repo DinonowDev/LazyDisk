@@ -6,6 +6,7 @@ public actor DirectorySizeIndex {
 
     private var sizesByPath: [String: Int64] = [:]
     private var inflightWalks: [String: Task<DirectorySizeWalker.WalkResult, Never>] = [:]
+    private var partialObservers: [String: [@Sendable (DirectorySizeWalker.WalkResult) -> Void]] = [:]
 
     public func size(for path: String) -> Int64? {
         sizesByPath[path]
@@ -29,8 +30,19 @@ public actor DirectorySizeIndex {
     ) async -> DirectorySizeWalker.WalkResult {
         let key = PathUtils.resolved(url).path
 
+        if let onPartial {
+            partialObservers[key, default: []].append(onPartial)
+        }
+
         if let existing = inflightWalks[key] {
             return await existing.value
+        }
+
+        let keyCopy = key
+        let partialHandler: @Sendable (DirectorySizeWalker.WalkResult) -> Void = { result in
+            Task {
+                await DirectorySizeIndex.shared.notifyPartialObservers(for: keyCopy, result: result)
+            }
         }
 
         let task = Task<DirectorySizeWalker.WalkResult, Never> {
@@ -39,7 +51,7 @@ public actor DirectorySizeIndex {
                     at: URL(fileURLWithPath: key, isDirectory: true),
                     configuration: configuration,
                     shouldCancel: shouldCancel,
-                    onPartial: onPartial
+                    onPartial: partialHandler
                 )
             }.value
         }
@@ -47,8 +59,18 @@ public actor DirectorySizeIndex {
 
         let result = await task.value
         inflightWalks.removeValue(forKey: key)
+        partialObservers.removeValue(forKey: key)
         store(result, forRoot: key)
         return result
+    }
+
+    private func notifyPartialObservers(
+        for key: String,
+        result: DirectorySizeWalker.WalkResult
+    ) {
+        for observer in partialObservers[key, default: []] {
+            observer(result)
+        }
     }
 
     public func store(_ result: DirectorySizeWalker.WalkResult, forRoot rootPath: String) {
@@ -75,5 +97,6 @@ public actor DirectorySizeIndex {
         }
         sizesByPath.removeAll()
         inflightWalks.removeAll()
+        partialObservers.removeAll()
     }
 }
