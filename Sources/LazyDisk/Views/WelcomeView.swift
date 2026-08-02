@@ -9,8 +9,9 @@ struct WelcomeView: View {
 
             VStack(spacing: 0) {
                 Spacer()
-                heroSection.padding(.bottom, 40)
-                volumeCard.padding(.horizontal, 48).frame(maxWidth: 480)
+                heroSection.padding(.bottom, 32)
+                modeSelection.padding(.horizontal, 48).frame(maxWidth: 520)
+                volumeCard.padding(.horizontal, 48).frame(maxWidth: 480).padding(.top, 24)
                 actionButtons.padding(.top, 32).padding(.horizontal, 48)
                 Spacer()
                 footerHint.padding(.bottom, 28)
@@ -44,6 +45,26 @@ struct WelcomeView: View {
                     .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    private var modeSelection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L10n.modeSelectTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            HStack(spacing: 12) {
+                ForEach(InterfaceMode.allCases) { mode in
+                    ModeCard(
+                        mode: mode,
+                        isSelected: viewModel.interfaceMode == mode
+                    ) {
+                        viewModel.setInterfaceMode(mode)
+                    }
+                }
             }
         }
     }
@@ -156,5 +177,48 @@ struct WelcomeView: View {
             Spacer()
             Text(value).font(.system(size: 12, weight: highlight ? .bold : .medium, design: .monospaced)).foregroundStyle(highlight ? .primary : .secondary)
         }
+    }
+}
+
+private struct ModeCard: View {
+    let mode: InterfaceMode
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: mode.icon)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+
+                Text(mode.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(mode.subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(+2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .padding(.horizontal, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(
+                                isSelected ? Color.accentColor : Color.primary.opacity(0.08),
+                                lineWidth: isSelected ? 2 : 1
+                            )
+                    }
+                    .shadow(color: isSelected ? Color.accentColor.opacity(0.15) : .black.opacity(0.04), radius: 8, y: 3)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }

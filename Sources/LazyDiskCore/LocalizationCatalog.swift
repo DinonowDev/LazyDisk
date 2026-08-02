@@ -96,6 +96,10 @@ public enum StringKey: String, CaseIterable {
     case finderAnalyzeVolumeNotFound, finderAnalyzeHelp
     // About
     case menuAbout, aboutTagline, aboutVersion, aboutDeveloper, aboutCopyright, aboutLicense, aboutGitHub
+    // Interface mode
+    case modeSelectTitle, modeSimple, modeSimpleDesc, modeProfessional, modeProfessionalDesc, prefInterfaceMode
+    case simpleChartScanning
+    case simpleChartScanProgress, simpleChartScanRemaining, simpleChartScanCurrent
 }
 
 public struct LocalizationCatalog {
@@ -525,6 +529,16 @@ public struct LocalizationCatalog {
         .aboutCopyright: ml(en: "Copyright", fa: "حق نشر", zh: "版权", fr: "Copyright", ar: "حقوق النشر", tr: "Telif hakkı"),
         .aboutLicense: ml(en: "License", fa: "مجوز", zh: "许可证", fr: "Licence", ar: "الترخيص", tr: "Lisans"),
         .aboutGitHub: ml(en: "View on GitHub", fa: "مشاهده در GitHub", zh: "在 GitHub 上查看", fr: "Voir sur GitHub", ar: "عرض على GitHub", tr: "GitHub'da görüntüle"),
+        .modeSelectTitle: ml(en: "Choose your experience", fa: "تجربه خود را انتخاب کنید", zh: "选择体验模式", fr: "Choisissez votre expérience", ar: "اختر تجربتك", tr: "Deneyiminizi seçin"),
+        .modeSimple: ml(en: "Simple", fa: "ساده", zh: "简洁", fr: "Simple", ar: "بسيط", tr: "Basit"),
+        .modeSimpleDesc: ml(en: "Sunburst chart & file list", fa: "نمودار و لیست فایل", zh: "旭日图和文件列表", fr: "Graphique et liste", ar: "مخطط وقائمة ملفات", tr: "Güneş grafiği ve dosya listesi"),
+        .modeProfessional: ml(en: "Professional", fa: "حرفه‌ای", zh: "专业", fr: "Professionnel", ar: "احترافي", tr: "Profesyonel"),
+        .modeProfessionalDesc: ml(en: "Full features & tools", fa: "تمام امکانات و ابزارها", zh: "完整功能和工具", fr: "Toutes les fonctions", ar: "جميع الميزات والأدوات", tr: "Tüm özellikler ve araçlar"),
+        .prefInterfaceMode: ml(en: "Interface mode", fa: "حالت رابط", zh: "界面模式", fr: "Mode d'interface", ar: "وضع الواجهة", tr: "Arayüz modu"),
+        .simpleChartScanning: ml(en: "Scanning subfolders…", fa: "در حال اسکن زیرپوشه‌ها…", zh: "正在扫描子文件夹…", fr: "Analyse des sous-dossiers…", ar: "جارٍ فحص المجلدات الفرعية…", tr: "Alt klasörler taranıyor…"),
+        .simpleChartScanProgress: ml(en: "%d of %d folders", fa: "%d از %d فولدر", zh: "%d / %d 文件夹", fr: "%d sur %d dossiers", ar: "%d من %d مجلد", tr: "%d / %d klasör"),
+        .simpleChartScanRemaining: ml(en: "%d remaining", fa: "%d باقی‌مانده", zh: "剩余 %d", fr: "%d restants", ar: "%d متبقٍ", tr: "%d kaldı"),
+        .simpleChartScanCurrent: ml(en: "Scanning: %@", fa: "در حال اسکن: %@", zh: "正在扫描：%@", fr: "Analyse : %@", ar: "جارٍ فحص: %@", tr: "Taranıyor: %@"),
     ]
 
     private static func ml(en: String, fa: String, zh: String, fr: String, ar: String, tr: String) -> [AppLanguage: String] {

@@ -21,6 +21,10 @@ extension DiskBrowserViewModel {
     func startInitialScan() {
         guard let volume = selectedVolume else { return }
 
+        if interfaceMode == .simple {
+            chartStyle = .rose
+        }
+
         scanTask?.cancel()
         prefetchTask?.cancel()
         appPhase = .scanning

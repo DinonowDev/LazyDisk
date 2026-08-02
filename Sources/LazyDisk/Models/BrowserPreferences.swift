@@ -93,6 +93,7 @@ struct AppPreferences: Sendable {
     var sortOrder: SortOrder = .sizeDescending
     var contentFilter: ContentFilter = .all
     var chartStyle: ChartStyle = .rose
+    var interfaceMode: InterfaceMode = .simple
     var usePersistentCache: Bool = true
     var showHiddenFiles: Bool = true
     var language: AppLanguage = .system
@@ -123,6 +124,7 @@ private struct StoredPreferences: Codable {
     var sortOrder: String
     var contentFilter: String
     var chartStyle: String
+    var interfaceMode: String?
     var usePersistentCache: Bool
     var showHiddenFiles: Bool
     var language: String
@@ -135,6 +137,7 @@ private struct StoredPreferences: Codable {
         sortOrder = appPreferences.sortOrder.rawValue
         contentFilter = appPreferences.contentFilter.rawValue
         chartStyle = appPreferences.chartStyle.rawValue
+        interfaceMode = appPreferences.interfaceMode.rawValue
         usePersistentCache = appPreferences.usePersistentCache
         showHiddenFiles = appPreferences.showHiddenFiles
         language = appPreferences.language.rawValue
@@ -149,6 +152,7 @@ private struct StoredPreferences: Codable {
             sortOrder: SortOrder(rawValue: sortOrder) ?? .sizeDescending,
             contentFilter: ContentFilter(rawValue: contentFilter) ?? .all,
             chartStyle: ChartStyle(rawValue: chartStyle) ?? .rose,
+            interfaceMode: InterfaceMode(rawValue: interfaceMode ?? "") ?? .professional,
             usePersistentCache: usePersistentCache,
             showHiddenFiles: showHiddenFiles,
             language: AppLanguage(rawValue: language) ?? .system,

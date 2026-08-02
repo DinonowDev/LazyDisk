@@ -2,10 +2,11 @@ import SwiftUI
 
 struct ChartStylePicker: View {
     @Binding var selection: ChartStyle
+    var styles: [ChartStyle] = ChartStyle.allCases
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(ChartStyle.allCases) { style in
+            ForEach(styles) { style in
                 Button {
                     selection = style
                 } label: {

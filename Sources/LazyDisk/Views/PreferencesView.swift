@@ -55,10 +55,27 @@ struct PreferencesView: View {
 
             GroupBox(L10n.prefDisplay) {
                 VStack(alignment: .leading, spacing: 14) {
-                    ChartStylePicker(selection: Binding(
-                        get: { viewModel.chartStyle },
-                        set: { viewModel.setChartStyle($0) }
-                    ))
+                    Picker(L10n.prefInterfaceMode, selection: interfaceModeBinding) {
+                        ForEach(InterfaceMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if viewModel.interfaceMode == .professional {
+                        ChartStylePicker(selection: Binding(
+                            get: { viewModel.chartStyle },
+                            set: { viewModel.setChartStyle($0) }
+                        ))
+                    } else {
+                        ChartStylePicker(
+                            selection: Binding(
+                                get: { viewModel.chartStyle },
+                                set: { viewModel.setChartStyle($0) }
+                            ),
+                            styles: [.rose, .sunburst]
+                        )
+                    }
 
                     Picker(L10n.prefDefaultSort, selection: $viewModel.sortOrder) {
                         ForEach(SortOrder.allCases) { order in
@@ -85,7 +102,7 @@ struct PreferencesView: View {
             }
         }
         .padding(24)
-        .frame(width: 440, height: 420)
+        .frame(width: 440, height: 460)
     }
 
     private var cacheBinding: Binding<Bool> {
@@ -119,6 +136,13 @@ struct PreferencesView: View {
                 prefs.save()
                 viewModel.refreshLanguage()
             }
+        )
+    }
+
+    private var interfaceModeBinding: Binding<InterfaceMode> {
+        Binding(
+            get: { viewModel.interfaceMode },
+            set: { viewModel.setInterfaceMode($0) }
         )
     }
 }

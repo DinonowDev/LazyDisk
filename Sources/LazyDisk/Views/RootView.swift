@@ -19,8 +19,13 @@ struct RootView: View {
                     .transition(.opacity)
 
             case .ready:
-                ContentView()
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                if viewModel.interfaceMode == .simple {
+                    SimpleContentView()
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                } else {
+                    ContentView()
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
             }
         }
         .animation(.easeInOut(duration: 0.35), value: viewModel.appPhase)

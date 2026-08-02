@@ -401,6 +401,22 @@ enum L10n {
 
     // Extended
     static var welcomeTagline: String { t(.welcomeTagline) }
+    static var modeSelectTitle: String { t(.modeSelectTitle) }
+    static var modeSimple: String { t(.modeSimple) }
+    static var modeSimpleDesc: String { t(.modeSimpleDesc) }
+    static var modeProfessional: String { t(.modeProfessional) }
+    static var modeProfessionalDesc: String { t(.modeProfessionalDesc) }
+    static var prefInterfaceMode: String { t(.prefInterfaceMode) }
+    static var simpleChartScanning: String { t(.simpleChartScanning) }
+    static func simpleChartScanProgress(_ completed: Int, _ total: Int) -> String {
+        String(format: t(.simpleChartScanProgress), completed, total)
+    }
+    static func simpleChartScanRemaining(_ count: Int) -> String {
+        String(format: t(.simpleChartScanRemaining), count)
+    }
+    static func simpleChartScanCurrent(_ name: String) -> String {
+        String(format: t(.simpleChartScanCurrent), name)
+    }
     static var selectVolume: String { t(.selectVolume) }
     static var totalCapacity: String { t(.totalCapacity) }
     static var availableLabel: String { t(.availableLabel) }

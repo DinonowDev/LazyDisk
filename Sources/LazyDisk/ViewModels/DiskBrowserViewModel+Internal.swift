@@ -92,6 +92,7 @@ extension DiskBrowserViewModel {
 
     func clearChartChildMap() {
         publishChartChildMap([:])
+        chartChildrenScanProgress = nil
     }
 
     func publishChartChildMap(_ newMap: [String: [DiskItem]]) {
@@ -103,11 +104,12 @@ extension DiskBrowserViewModel {
     }
 
     func chartChildren(from entries: [DiskItem]) -> [DiskItem] {
-        Array(
+        let limit = interfaceMode == .simple ? 12 : 8
+        return Array(
             entries
                 .filter { !$0.isVirtual && ($0.size > 0 || $0.isDirectory) }
                 .sorted { $0.size > $1.size }
-                .prefix(8)
+                .prefix(limit)
         )
     }
 

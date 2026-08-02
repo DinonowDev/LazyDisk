@@ -24,6 +24,7 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var sortOrder: SortOrder = AppPreferences.load().sortOrder
     @Published var contentFilter: ContentFilter = AppPreferences.load().contentFilter
     @Published var chartStyle: ChartStyle = AppPreferences.load().chartStyle
+    @Published var interfaceMode: InterfaceMode = AppPreferences.load().interfaceMode
     @Published var showPreferences = false
     @Published var showDonation = false
     @Published var showAbout = false
@@ -80,6 +81,8 @@ final class DiskBrowserViewModel: ObservableObject {
 
     @Published var exportMessage: String?
     @Published var chartChildMap: [String: [DiskItem]] = [:]
+    @Published var isChartChildrenLoading = false
+    @Published var chartChildrenScanProgress: ChartChildrenScanProgress?
 
     // Smart collections
     @Published var activeSmartCollection: SmartCollection?
@@ -279,10 +282,12 @@ final class DiskBrowserViewModel: ObservableObject {
            cached.childMapKey == key {
             return cached.value
         }
+        let config: SunburstLayoutEngine.Config = interfaceMode == .simple ? .daisyDisk : .standard
         let segments = SunburstLayoutEngine.build(
             items: chartItems,
             totalSize: displayTotalSize,
-            childrenByParentPath: chartChildMap
+            childrenByParentPath: chartChildMap,
+            config: config
         )
         cachedSunburstSegments = (chartCacheRevision, key, segments)
         return segments
