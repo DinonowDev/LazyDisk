@@ -10,8 +10,12 @@ extension DiskScanner {
         onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
     ) async -> [DiskItem] {
         let effectiveConfiguration = onPartial == nil ? .fastSizing : configuration
+        let childURLs = items
+            .filter { $0.isDirectory && !$0.isVirtual }
+            .map(\.url)
         let walk = await childWalk(
             for: parent,
+            listedChildren: childURLs,
             configuration: effectiveConfiguration,
             shouldCancel: shouldCancel,
             onPartial: onPartial
@@ -21,12 +25,14 @@ extension DiskScanner {
 
     func childWalk(
         for url: URL,
+        listedChildren: [URL]? = nil,
         configuration: DirectorySizeWalker.Configuration = .default,
         shouldCancel: (@Sendable () -> Bool)? = nil,
         onPartial: (@Sendable (DirectorySizeWalker.WalkResult) -> Void)? = nil
     ) async -> DirectorySizeWalker.WalkResult {
         await DirectorySizeIndex.shared.walk(
             at: url,
+            listedChildren: listedChildren,
             configuration: configuration,
             shouldCancel: shouldCancel,
             onPartial: onPartial

@@ -3,7 +3,7 @@ import Foundation
 import Quartz
 
 enum QuickLookService {
-    private static var activeDataSource: PreviewDataSource?
+    @MainActor private static var activeDataSource: PreviewDataSource?
 
     @MainActor
     static func preview(urls: [URL]) {

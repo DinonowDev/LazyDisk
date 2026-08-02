@@ -134,6 +134,40 @@ extension DiskBrowserViewModel {
 
     // MARK: - Prefetch
 
+    func prefetchSidebarFirstLevel(volume: VolumeInfo) async {
+        let directories = entries
+            .filter { $0.isDirectory && !$0.isVirtual }
+            .sorted { $0.size > $1.size }
+
+        for item in directories {
+            guard !Task.isCancelled else { return }
+
+            let folderURL = PathUtils.resolved(item.url)
+            if await cache.has(folderURL) { continue }
+
+            let scanned = await scanner.scanFolderContents(at: folderURL, light: true)
+            guard !Task.isCancelled else { return }
+
+            let sorted = scanned.sorted { $0.size > $1.size }
+            let cached = CachedDirectory(
+                url: folderURL,
+                entries: sorted,
+                scannedAt: Date(),
+                isVolumeRoot: false,
+                contentLevel: .light
+            )
+            guard await cache.isComplete(cached) else { continue }
+
+            await cache.set(
+                folderURL,
+                entries: sorted,
+                isVolumeRoot: false,
+                contentLevel: .light
+            )
+            await SizeIndexCoordinator.shared.schedulePersist(for: volume.id)
+        }
+    }
+
     func startSmartPrefetch(chartMap: [String: [DiskItem]]? = nil) {
         let map = chartMap ?? chartChildMap
         let parents = chartItems.filter { $0.isDirectory && !$0.isVirtual }
