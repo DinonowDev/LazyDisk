@@ -23,14 +23,13 @@ struct SimpleContentView: View {
         viewModel.chartStyle == .sunburst && viewModel.isChartChildrenLoading
     }
 
-    /// Level 1 = volume root. No chart preview while loading at this level.
+    /// Progressive sunburst preview while deeper rings are still loading.
     private var showsChartPreviewWhileLoading: Bool {
-        showSunburstLoading && !viewModel.isAtVolumeRoot
+        showSunburstLoading
     }
 
     private var showsSunburstChart: Bool {
         guard viewModel.chartStyle == .sunburst else { return false }
-        if showSunburstLoading && viewModel.isAtVolumeRoot { return false }
         return !viewModel.sunburstSegments.isEmpty || showsChartPreviewWhileLoading
     }
 

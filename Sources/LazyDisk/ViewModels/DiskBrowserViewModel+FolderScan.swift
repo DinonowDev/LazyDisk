@@ -39,6 +39,7 @@ extension DiskBrowserViewModel {
 
         let scanned = await scanner.scanDirectorySizes(
             items: listed,
+            parent: normalized,
             parallelism: AppPreferences.load().scanParallelism
         ) { [weak self] update in
             DispatchQueue.main.async {
@@ -82,7 +83,6 @@ extension DiskBrowserViewModel {
     func startPrefetching(from items: [DiskItem]) {
         prefetchTask?.cancel()
         let directories = items.filter { $0.isDirectory && !$0.isVirtual }
-        let parallelism = AppPreferences.load().scanParallelism
 
         prefetchTask = Task.detached(priority: .utility) { [weak viewModel = self] in
             let total = directories.count
@@ -92,13 +92,9 @@ extension DiskBrowserViewModel {
                 let folderURL = PathUtils.resolved(item.url)
                 if await ScanCache.shared.has(folderURL) { continue }
 
-                let listed = await DiskScanner.shared.listDirectory(at: folderURL)
                 guard !Task.isCancelled else { return }
 
-                let scanned = await DiskScanner.shared.scanDirectorySizes(
-                    items: listed,
-                    parallelism: parallelism
-                )
+                let scanned = await DiskScanner.shared.scanFolderContents(at: folderURL, light: true)
                 guard !Task.isCancelled else { return }
 
                 let sorted = scanned.sorted { $0.size > $1.size }
