@@ -19,14 +19,7 @@ jobs:
         run: swift build
 
       - name: Test
-        run: |
-          set -euo pipefail
-          mapfile -t test_classes < <(swift test --list-tests 2>/dev/null | sed 's|/[^/]*$||' | sed 's|.*\.||' | sort -u)
-          for class in "${test_classes[@]}"; do
-            echo "::group::swift test --filter ${class}"
-            swift test --filter "$class" || { echo "::error title=Test failed::${class}"; exit 1; }
-            echo "::endgroup::"
-          done
+        run: swift test
 
       - name: APFS clone integration
         run: swift test --filter APFSCloneIntegrationTests
