@@ -11,9 +11,14 @@ ICONSET="$ROOT/assets/AppIcon.iconset"
 ICON_ICNS="$ROOT/assets/AppIcon.icns"
 ZIP_PATH="$DIST_DIR/${APP_NAME}.zip"
 
+HELPER_LABEL="com.lazydisk.app.AdminHelper"
+HELPER_INFO="$ROOT/Scripts/AdminHelper-Info.plist"
+HELPER_LAUNCHD="$ROOT/Scripts/LaunchDaemons/com.lazydisk.app.AdminHelper.plist"
+
 echo "Building $APP_NAME..."
 cd "$ROOT"
 swift build -c release
+swift build -c release --product LazyDiskPrivilegedHelper
 
 if [[ -f "$ICON_ICNS" ]]; then
   echo "Using app icon: $ICON_ICNS"
@@ -28,6 +33,13 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 cp "$BUILD_DIR/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
+
+HELPER_DST="$APP_DIR/Contents/Library/LaunchServices/$HELPER_LABEL"
+mkdir -p "$(dirname "$HELPER_DST")"
+mkdir -p "$APP_DIR/Contents/Library/LaunchDaemons"
+cp "$BUILD_DIR/LazyDiskPrivilegedHelper" "$HELPER_DST"
+cp "$HELPER_LAUNCHD" "$APP_DIR/Contents/Library/LaunchDaemons/$HELPER_LABEL.plist"
+chmod +x "$HELPER_DST"
 
 INFO_TEMPLATE="$ROOT/Scripts/Info.plist.template"
 if [[ -f "$INFO_TEMPLATE" ]]; then
@@ -76,6 +88,19 @@ chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 
 SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
 if [[ -n "$SIGN_IDENTITY" ]]; then
+  echo "Signing privileged helper..."
+  codesign --force --options runtime \
+    --info-plist "$HELPER_INFO" \
+    --sign "$SIGN_IDENTITY" \
+    "$HELPER_DST"
+
+  HELPER_REQ="$(codesign --display -r - "$HELPER_DST" 2>&1 | sed -n 's/^designated => //p')"
+  if [[ -n "$HELPER_REQ" ]]; then
+    /usr/libexec/PlistBuddy -c "Add :SMPrivilegedExecutables dict" "$APP_DIR/Contents/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Delete :SMPrivilegedExecutables:$HELPER_LABEL" "$APP_DIR/Contents/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :SMPrivilegedExecutables:$HELPER_LABEL string $HELPER_REQ" "$APP_DIR/Contents/Info.plist"
+  fi
+
   echo "Signing with identity: $SIGN_IDENTITY"
   codesign --force --deep --options runtime \
     --entitlements "$ENTITLEMENTS" \
@@ -85,6 +110,7 @@ if [[ -n "$SIGN_IDENTITY" ]]; then
 else
   echo "Skipping Developer ID signing (set CODE_SIGN_IDENTITY to sign for distribution)"
   if [[ -f "$ENTITLEMENTS" ]]; then
+    codesign --force --sign - --info-plist "$HELPER_INFO" "$HELPER_DST" 2>/dev/null || true
     codesign --force --deep --sign - --entitlements "$ENTITLEMENTS" "$APP_DIR" 2>/dev/null || true
   fi
 fi
@@ -126,6 +152,36 @@ if [[ "${NOTARIZE_APP:-}" == "1" ]]; then
   notarize_app
 fi
 
+verify_bless() {
+  if [[ -z "$SIGN_IDENTITY" ]]; then
+    echo "VERIFY_BLESS skipped (set CODE_SIGN_IDENTITY to validate SMJobBless wiring)."
+    return 0
+  fi
+  if ! /usr/libexec/PlistBuddy -c "Print :SMPrivilegedExecutables:$HELPER_LABEL" "$APP_DIR/Contents/Info.plist" &>/dev/null; then
+    echo "Error: SMPrivilegedExecutables missing entry for $HELPER_LABEL"
+    exit 1
+  fi
+  if [[ ! -x "$HELPER_DST" ]]; then
+    echo "Error: helper binary missing at $HELPER_DST"
+    exit 1
+  fi
+  codesign --verify --strict "$HELPER_DST"
+  if ! otool -l "$HELPER_DST" | grep -q __info_plist; then
+    echo "Error: helper Mach-O missing embedded __info_plist (SMJobBless requires -sectcreate)"
+    exit 1
+  fi
+  if ! otool -l "$HELPER_DST" | grep -q __launchd_plist; then
+    echo "Error: helper Mach-O missing embedded __launchd_plist"
+    exit 1
+  fi
+  echo "Bless wiring OK (helper signed, SMPrivilegedExecutables present, embedded plists verified)."
+  echo "Run on a clean machine: open dist/LazyDisk.app → Permissions → Install Admin Helper."
+}
+
+if [[ "${VERIFY_BLESS:-}" == "1" ]]; then
+  verify_bless
+fi
+
 echo "Done! App bundle created at:"
 echo "  $APP_DIR"
 echo ""
@@ -137,3 +193,6 @@ echo ""
 echo "Notarization (after signing):"
 echo "  NOTARIZE_APP=1 NOTARYTOOL_PROFILE=\"your-profile\" CODE_SIGN_IDENTITY=\"Developer ID Application: …\" ./Scripts/build-app.sh"
 echo "  # or: NOTARIZE_APP=1 APPLE_ID=… APPLE_APP_SPECIFIC_PASSWORD=… APPLE_TEAM_ID=… CODE_SIGN_IDENTITY=… ./Scripts/build-app.sh"
+echo ""
+echo "Bless verification (signed builds):"
+echo "  VERIFY_BLESS=1 CODE_SIGN_IDENTITY=\"Developer ID Application: …\" ./Scripts/build-app.sh"
