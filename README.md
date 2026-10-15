@@ -126,7 +126,7 @@ CI runs `swift build`, `swift test`, and `Scripts/build-app.sh` on macOS via Git
 
 Pre-built `.app` bundles are available on **[GitHub Releases](https://github.com/DinonowDev/LazyDisk/releases)**.
 
-**Latest:** [v2.0.1](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-2.0.1-macos.zip` (macOS 13+, Apple Silicon & Intel)
+**Latest:** [v2.0.2](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-2.0.2-macos.zip` (macOS 13+, Apple Silicon & Intel)
 
 1. Download the latest release zip.
 2. Unzip and open `LazyDisk.app` (right-click → **Open** if Gatekeeper blocks unsigned builds).
