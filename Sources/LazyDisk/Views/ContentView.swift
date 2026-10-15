@@ -241,8 +241,11 @@ struct ContentView: View {
     }
 
     private var mainPanel: some View {
-        chartPanel
-            .animation(.easeInOut(duration: 0.25), value: viewModel.navigationAnimationID)
+        VStack(spacing: 0) {
+            RestrictedScanBannerView()
+            chartPanel
+        }
+        .animation(.easeInOut(duration: 0.25), value: viewModel.navigationAnimationID)
     }
 
     private var chartPanel: some View {
@@ -281,6 +284,18 @@ private struct ChartPanelView: View {
         chartHoverID ?? viewModel.hoveredID
     }
 
+    private var browserChartLoadingOverlay: Bool {
+        viewModel.isBrowserChartLoading
+    }
+
+    private var browserChartShowsSunburst: Bool {
+        !viewModel.sunburstSegments.isEmpty
+    }
+
+    private var browserChartShowsRose: Bool {
+        viewModel.chartStyle != .sunburst || viewModel.sunburstSegments.isEmpty
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             DiskOverviewHeader(
@@ -301,9 +316,9 @@ private struct ChartPanelView: View {
             .padding(.top, 12)
             .padding(.bottom, 16)
 
-            ZStack(alignment: chartPickerAlignment) {
+            ZStack {
                 Group {
-                    if viewModel.chartStyle == .sunburst {
+                    if viewModel.chartStyle == .sunburst, browserChartShowsSunburst {
                         SunburstChartView(
                             segments: viewModel.sunburstSegments,
                             totalSize: viewModel.displayTotalSize,
@@ -332,7 +347,7 @@ private struct ChartPanelView: View {
                     //             viewModel.addToCollector(item)
                     //         }
                     //     )
-                    } else {
+                    } else if browserChartShowsRose {
                         RoseChartView(
                             items: viewModel.chartItems,
                             totalSize: viewModel.displayTotalSize,
@@ -349,7 +364,17 @@ private struct ChartPanelView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
+                .allowsHitTesting(!browserChartLoadingOverlay)
                 .animation(.easeInOut(duration: 0.25), value: viewModel.chartStyle)
+
+                if browserChartLoadingOverlay {
+                    ChartChildrenScanOverlay(
+                        totalSize: viewModel.displayTotalSize,
+                        progress: viewModel.browserChartScanProgress
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
 
                 ChartStylePicker(selection: Binding(
                     get: { viewModel.chartStyle },
@@ -357,7 +382,10 @@ private struct ChartPanelView: View {
                 ))
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: chartPickerAlignment)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .layoutPriority(1)
 
             chartHint
         }
@@ -369,7 +397,7 @@ private struct ChartPanelView: View {
             chartHoverID = nil
         }
         .task(id: chartChildrenRefreshKey) {
-            viewModel.refreshChartChildren()
+            viewModel.refreshChartChildrenIfNeeded()
         }
     }
 

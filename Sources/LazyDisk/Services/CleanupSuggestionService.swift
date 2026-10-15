@@ -140,7 +140,7 @@ enum CleanupSuggestionService {
 
     private static func scanInstallers(in folder: URL) async -> [CleanupSuggestion] {
         guard FileManager.default.fileExists(atPath: folder.path) else { return [] }
-        let extensions = Set(["dmg", "pkg", "iso", "zip"])
+        let extensions = Set(["dmg", "pkg", "iso"])
 
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: folder,

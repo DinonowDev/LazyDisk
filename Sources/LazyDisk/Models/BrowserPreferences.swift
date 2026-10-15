@@ -121,6 +121,9 @@ struct AppPreferences: Sendable {
     var searchScope: SearchScope = .entireVolume
     var freeSpaceGoalGB: Double = 10
     var browserSidebarWidth: Double = 320
+    var emptyTrashAfterBulkDelete: Bool = false
+    /// When false, the app stays on Welcome until you choose permissions and start scan.
+    var autoResumeLastSession: Bool = false
 
     static let userDefaultsKey = "LazyDisk.preferences"
 
@@ -164,6 +167,8 @@ private struct StoredPreferences: Codable {
     var searchScope: String
     var freeSpaceGoalGB: Double?
     var browserSidebarWidth: Double?
+    var emptyTrashAfterBulkDelete: Bool?
+    var autoResumeLastSession: Bool?
 
     init(appPreferences: AppPreferences) {
         sortOrder = appPreferences.sortOrder.rawValue
@@ -177,6 +182,8 @@ private struct StoredPreferences: Codable {
         searchScope = appPreferences.searchScope.rawValue
         freeSpaceGoalGB = appPreferences.freeSpaceGoalGB
         browserSidebarWidth = appPreferences.browserSidebarWidth
+        emptyTrashAfterBulkDelete = appPreferences.emptyTrashAfterBulkDelete
+        autoResumeLastSession = appPreferences.autoResumeLastSession
     }
 
     var appPreferences: AppPreferences {
@@ -191,7 +198,9 @@ private struct StoredPreferences: Codable {
             scanParallelism: max(1, min(scanParallelism, 16)),
             searchScope: SearchScope(rawValue: searchScope) ?? .entireVolume,
             freeSpaceGoalGB: freeSpaceGoalGB ?? 10,
-            browserSidebarWidth: browserSidebarWidth ?? 320
+            browserSidebarWidth: browserSidebarWidth ?? 320,
+            emptyTrashAfterBulkDelete: emptyTrashAfterBulkDelete ?? false,
+            autoResumeLastSession: autoResumeLastSession ?? false
         )
     }
 }

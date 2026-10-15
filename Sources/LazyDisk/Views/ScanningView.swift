@@ -29,8 +29,7 @@ struct ScanningView: View {
                 ScanProgressPanelView(
                     title: viewModel.scanProgress.isEmpty ? L10n.scanning : viewModel.scanProgress,
                     subtitle: viewModel.scanCurrentFolder.isEmpty ? nil : viewModel.scanCurrentFolder,
-                    fraction: viewModel.scanProgressFraction,
-                    detail: nil
+                    fraction: viewModel.scanProgressFraction
                 )
                 .frame(maxWidth: 520)
 

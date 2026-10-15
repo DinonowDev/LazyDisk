@@ -26,18 +26,10 @@ extension FolderSidebarView {
                 )
 
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(viewModel.isDetailPanelVisible ? L10n.detailTitle : L10n.panelBrowser)
-                        .font(.system(size: 12, weight: .bold))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    if viewModel.loadedFromCache && !viewModel.isDetailPanelVisible {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.orange)
-                            .help(L10n.scanFromCache)
-                    }
-                }
+                Text(viewModel.isDetailPanelVisible ? L10n.detailTitle : L10n.panelBrowser)
+                    .font(.system(size: 12, weight: .bold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 HStack(spacing: 3) {
                     if viewModel.isDetailPanelVisible, let item = viewModel.detailItem {

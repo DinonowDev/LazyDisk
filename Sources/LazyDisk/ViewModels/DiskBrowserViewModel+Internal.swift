@@ -1,9 +1,31 @@
 // DiskBrowserViewModel+Internal.swift — Shared publish helpers, caches, and chart child map.
 import AppKit
 import Foundation
+import LazyDiskCore
 import SwiftUI
 
 extension DiskBrowserViewModel {
+    func beginScanCancellationTracking() -> @Sendable () -> Bool {
+        let flag = ScanCancellationFlag()
+        activeScanCancelFlag = flag
+        return flag.shouldCancelHandler()
+    }
+
+    func endScanCancellationTracking() {
+        activeScanCancelFlag = nil
+    }
+
+    func cancelActiveNativeScan() {
+        activeScanCancelFlag?.cancel()
+    }
+
+    func activeScanCancelHandler() -> @Sendable () -> Bool {
+        if let flag = activeScanCancelFlag {
+            return flag.shouldCancelHandler()
+        }
+        return ScanCancellationFlag.taskCancellationFallback
+    }
+
     func publishAfterCurrentUpdate(_ update: @MainActor @escaping () -> Void) {
         Task { @MainActor in
             update()
@@ -13,6 +35,7 @@ extension DiskBrowserViewModel {
     func publishScanProgress(
         _ update: ScanProgressUpdate,
         trackDetailedProgress: Bool,
+        responsiveUI: Bool = false,
         generation: UInt?
     ) {
         publishAfterCurrentUpdate { [weak self] in
@@ -21,36 +44,44 @@ extension DiskBrowserViewModel {
 
             if trackDetailedProgress {
                 let sizing = update.sizingFraction
-                self.scanProgressFraction = ScanProgressMath.volumeScanDisplayFraction(
-                    phaseBase: 0.1,
-                    sizingFraction: sizing,
-                    published: self.scanProgressFraction
-                )
+                self.scanProgressFraction = self.isGatedSplashVolumeScan
+                    ? VolumeSplashProgressPhases.sizingFromVolumeFraction(
+                        sizing,
+                        published: self.scanProgressFraction
+                    )
+                    : ScanProgressMath.volumeScanDisplayFraction(
+                        phaseBase: 0.1,
+                        sizingFraction: sizing,
+                        published: self.scanProgressFraction
+                    )
                 self.scanCurrentFolder = update.currentName
                 self.scanProgress = L10n.scanFoldersProgress(update.completed, update.total)
             }
 
-            if let partial = update.partialEntries {
+            if let partial = update.partialEntries,
+               self.appPhase == .ready
+                || (self.isGatedSplashVolumeScan && self.appPhase == .scanning) {
                 for item in partial where item.isDirectory && !item.isVirtual {
                     let path = PathUtils.resolved(item.url).path
                     self.pendingScanUpdates[path] = (item.size, item.isScanning)
                 }
-                self.scheduleScanUIBatch(generation: generation)
+                self.scheduleScanUIBatch(generation: generation, responsiveUI: responsiveUI)
             } else if let path = update.itemPath {
                 let resolved = PathUtils.resolved(URL(fileURLWithPath: path)).path
                 let size = update.itemSize ?? self.entries.first(where: {
                     PathUtils.resolved($0.url).path == resolved
                 })?.size ?? 0
                 self.pendingScanUpdates[resolved] = (size, false)
-                self.scheduleScanUIBatch(generation: generation)
+                self.scheduleScanUIBatch(generation: generation, responsiveUI: responsiveUI)
             }
         }
     }
 
-    func scheduleScanUIBatch(generation: UInt?) {
+    func scheduleScanUIBatch(generation: UInt?, responsiveUI: Bool = false) {
         guard scanUIBatchTask == nil else { return }
+        let delayNs: UInt64 = responsiveUI ? 50_000_000 : 250_000_000
         scanUIBatchTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            try? await Task.sleep(nanoseconds: delayNs)
             guard !Task.isCancelled, let self else { return }
             defer { self.scanUIBatchTask = nil }
             guard generation == nil || generation == self.navigationGeneration else {

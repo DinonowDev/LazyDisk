@@ -15,8 +15,44 @@ extension DiskBrowserViewModel {
         }
 
         selectedVolume = volume
-        await restoreSessionFromCache(volume: volume)
+        isLoading = true
+        scanProgress = L10n.scanIncrementalChecking
+        scanProgressFraction = 0.05
+        withAnimation(.easeInOut(duration: 0.25)) {
+            appPhase = .scanning
+        }
+
+        await hydrateSessionFromCache(volume: volume)
+        await runGatedVolumeScan(volume: volume, preferIncremental: true)
         return true
+    }
+
+    /// Loads cached entries for navigation state without entering the main UI.
+    func hydrateSessionFromCache(volume: VolumeInfo) async {
+        let session = SessionStateStore.load()
+        let scanRoot = volume.scanRoot
+
+        guard let rootCached = await cache.get(scanRoot) else { return }
+
+        await SizeIndexCoordinator.shared.warm(for: volume)
+
+        currentPath = scanRoot
+        entries = rootCached.entries
+        loadedFromCache = true
+
+        if let pathString = session.lastPath {
+            let candidate = URL(fileURLWithPath: pathString, isDirectory: true)
+            if PathUtils.isWithinVolume(candidate, scanRoot: scanRoot),
+               candidate.path != PathUtils.resolved(scanRoot).path,
+               let pathCached = await cache.get(candidate),
+               await cache.isComplete(pathCached) {
+                currentPath = candidate
+                entries = pathCached.entries
+            }
+        }
+
+        invalidateAllDerivedCaches()
+        refreshChartChildrenIfNeeded()
     }
 
     func restoreSessionFromCache(volume: VolumeInfo) async {
@@ -50,12 +86,7 @@ extension DiskBrowserViewModel {
         refreshChartChildrenIfNeeded()
         SessionStateStore.save(volumeID: volume.id, path: currentPath)
 
-        withAnimation(.easeInOut(duration: 0.35)) {
-            appPhase = .ready
-        }
-
-        startSearchIndexBuild()
-        applyPendingExternalAnalyzeIfNeeded()
+        await enterAppAfterInitialScan(volume: volume)
         startBackgroundIncrementalRefresh(volume: volume)
     }
 
@@ -76,7 +107,7 @@ extension DiskBrowserViewModel {
             guard !Task.isCancelled else { return }
 
             if isAtVolumeRoot {
-                await prefetchInitialDepthLevels(scanRoot: volume.scanRoot)
+                await prepareInitialChartPresentation(volume: volume)
                 startBackgroundDepthPrefetch(scanRoot: volume.scanRoot)
             }
         }
@@ -96,7 +127,14 @@ extension DiskBrowserViewModel {
         guard generation == nil || generation == navigationGeneration else { return }
 
         if trackDetailedProgress {
-            scanProgressFraction = 0.05
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.preparing(
+                    fraction: 1,
+                    published: scanProgressFraction
+                )
+            } else {
+                scanProgressFraction = 0.05
+            }
             scanProgress = L10n.scanIncrementalChecking
             scanCurrentFolder = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
         }
@@ -154,14 +192,25 @@ extension DiskBrowserViewModel {
             scheduleSizeIndexPersist()
 
             if trackDetailedProgress {
-                scanProgressFraction = 1
-                scanProgress = L10n.scanIncrementalUpToDate
+                if isGatedSplashVolumeScan {
+                    scanProgressFraction = VolumeSplashProgressPhases.finalizing(
+                        subPhase: 1,
+                        published: scanProgressFraction
+                    )
+                } else {
+                    scanProgressFraction = max(scanProgressFraction, 0.88)
+                }
+                scanCurrentFolder = ""
             }
             return
         }
 
         if trackDetailedProgress {
-            scanProgressFraction = 0.12
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.listed(published: scanProgressFraction)
+            } else {
+                scanProgressFraction = 0.12
+            }
             scanProgress = L10n.scanIncrementalUpdating(plan.directoriesToRescan.count)
         }
 
@@ -221,8 +270,15 @@ extension DiskBrowserViewModel {
         scheduleSizeIndexPersist()
 
         if trackDetailedProgress {
-            scanProgressFraction = 1
-            scanProgress = L10n.scanIncrementalDone
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.finalizing(
+                    subPhase: 1,
+                    published: scanProgressFraction
+                )
+            } else {
+                scanProgressFraction = max(scanProgressFraction, 0.88)
+            }
+            scanCurrentFolder = ""
         }
     }
 
@@ -245,8 +301,15 @@ extension DiskBrowserViewModel {
             invalidateAllDerivedCaches()
         }
 
-        let fraction = 0.12 + (Double(update.completed) / Double(max(update.total, 1))) * 0.86
-        scanProgressFraction = max(scanProgressFraction, fraction)
+        let ratio = Double(update.completed) / Double(max(update.total, 1))
+        if isGatedSplashVolumeScan {
+            scanProgressFraction = VolumeSplashProgressPhases.sizing(
+                normalizedSizingFraction: ratio,
+                published: scanProgressFraction
+            )
+        } else {
+            scanProgressFraction = max(scanProgressFraction, 0.12 + ratio * 0.86)
+        }
         scanCurrentFolder = update.currentName
         scanProgress = L10n.scanIncrementalFolder(update.completed, update.total, update.currentName)
     }

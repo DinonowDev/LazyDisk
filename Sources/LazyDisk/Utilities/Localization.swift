@@ -439,6 +439,11 @@ enum L10n {
     }
     static var permTerminalTitle: String { t(.permTerminalTitle) }
     static var permTerminalHint: String { t(.permTerminalHint) }
+    static var permFDATargetTitle: String { t(.permFDATargetTitle) }
+    static func permFDATargetHint(_ path: String) -> String { String(format: t(.permFDATargetHint), path) }
+    static var permRestartAfterFDA: String { t(.permRestartAfterFDA) }
+    static var permCopyAppPath: String { t(.permCopyAppPath) }
+    static var permCheckAgain: String { t(.permCheckAgain) }
     static var back: String { t(.back) }
     static var openSettings: String { t(.openSettings) }
     static var scanAnyway: String { t(.scanAnyway) }
@@ -466,6 +471,8 @@ enum L10n {
     static func itemsSelected(_ count: Int) -> String { String(format: t(.itemsSelected), count) }
     static func hintSidebar(_ spaceHint: String) -> String { String(format: t(.hintSidebar), spaceHint) }
     static var permFullDiskTitle: String { t(.permFullDiskTitle) }
+    static var permAdminHelperTitle: String { t(.permAdminHelperTitle) }
+    static var permAdminHelperDesc: String { t(.permAdminHelperDesc) }
     static var permFullDiskDesc: String { t(.permFullDiskDesc) }
     static var permUserFilesTitle: String { t(.permUserFilesTitle) }
     static var permUserFilesDesc: String { t(.permUserFilesDesc) }
@@ -495,6 +502,7 @@ enum L10n {
     static var scanFinalizing: String { t(.scanFinalizing) }
     static var scanCaching: String { t(.scanCaching) }
     static func scanCachingFolders(_ done: Int, _ total: Int) -> String { String(format: t(.scanCachingFolders), done, total) }
+    static var scanIndexingTree: String { t(.scanIndexingTree) }
     static var scanIncrementalChecking: String { t(.scanIncrementalChecking) }
     static var scanIncrementalUpToDate: String { t(.scanIncrementalUpToDate) }
     static func scanIncrementalUpdating(_ count: Int) -> String { String(format: t(.scanIncrementalUpdating), count) }
@@ -537,7 +545,20 @@ enum L10n {
     static var warnLibraryTitle: String { t(.warnLibraryTitle) }
     static var warnLibraryMsg: String { t(.warnLibraryMsg) }
     static var warnBulkDeleteTitle: String { t(.warnBulkDeleteTitle) }
+    static var warnCloudPlaceholderTitle: String { t(.warnCloudPlaceholderTitle) }
+    static var warnCloudPlaceholderMsg: String { t(.warnCloudPlaceholderMsg) }
+    static var warnPurgeableVolumeTitle: String { t(.warnPurgeableVolumeTitle) }
+    static var warnPurgeableVolumeMsg: String { t(.warnPurgeableVolumeMsg) }
+    static var restrictedScanBannerTitle: String { t(.restrictedScanBannerTitle) }
+    static func restrictedScanBannerMessage(_ count: Int) -> String { String(format: t(.restrictedScanBannerMessage), count) }
+    static var restrictedScanInstallHelper: String { t(.restrictedScanInstallHelper) }
+    static var restrictedScanRetry: String { t(.restrictedScanRetry) }
+    static var scanMetricCloneMerged: String { t(.scanMetricCloneMerged) }
+    static var scanMetricHardlinkSkipped: String { t(.scanMetricHardlinkSkipped) }
+    static var scanMetricCloneGroups: String { t(.scanMetricCloneGroups) }
     static func warnBulkDeleteMsg(_ count: Int) -> String { String(format: t(.warnBulkDeleteMsg), count) }
+    static var deleteEmptyTrashOption: String { t(.deleteEmptyTrashOption) }
+    static var adminHelperInstalled: String { t(.adminHelperInstalled) }
     static func deleteSummary(count: Int, size: String) -> String {
         count == 1
             ? String(format: t(.deleteSummaryOne), size)

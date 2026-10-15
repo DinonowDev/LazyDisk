@@ -1,10 +1,13 @@
 // DiskBrowserViewModel.swift — central app state, published properties, and derived values.
 import AppKit
 import Foundation
+import LazyDiskCore
 import SwiftUI
 
 @MainActor
 final class DiskBrowserViewModel: ObservableObject {
+    /// Weak handle for background scan callbacks during the welcome splash.
+    static weak var activeSplashScan: DiskBrowserViewModel?
     @Published var appPhase: AppPhase = .welcome
     @Published var volumes: [VolumeInfo] = []
     @Published var selectedVolume: VolumeInfo?
@@ -80,8 +83,13 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var bookmarks: [FolderBookmark] = NavigationHistoryService.bookmarks()
 
     @Published var exportMessage: String?
+    @Published var lastScanMetrics: NativeScanMetrics?
+    @Published var restrictedScanEvents: [RestrictedScanEvent] = []
+    @Published var isInstallingAdminHelper = false
+    @Published var privilegedHelperScanProgress: PrivilegedScanProgress?
     @Published var chartChildMap: [String: [DiskItem]] = [:]
     @Published var isChartChildrenLoading = false
+    @Published var isInitialChartReady = true
     @Published var chartChildrenScanProgress: ChartChildrenScanProgress?
 
     // Smart collections
@@ -100,6 +108,7 @@ final class DiskBrowserViewModel: ObservableObject {
     var isSidebarWidthTrackingPaused = false
 
     var scanTask: Task<Void, Never>?
+    var activeScanCancelFlag: ScanCancellationFlag?
     var prefetchTask: Task<Void, Never>?
     var depthPrefetchTask: Task<Void, Never>?
     var chartChildRefreshTask: Task<Void, Never>?
@@ -114,6 +123,15 @@ final class DiskBrowserViewModel: ObservableObject {
     var smartCollectionTask: Task<Void, Never>?
     var goalTask: Task<Void, Never>?
     var navigationGeneration: UInt = 0
+    /// True while the welcome splash runs the initial volume scan (phased progress).
+    var isGatedSplashVolumeScan = false
+    var didSignalVolumeSplashReady = false
+    var volumeSplashReadyContinuation: CheckedContinuation<Void, Never>?
+    var pendingFusedVolumeChart: (
+        buildResult: ChartTreeBuilder.BuildResult,
+        root: URL,
+        listedEntries: [DiskItem]
+    )?
     var devJunkCache: [String: [DevJunkItem]] = [:]
     var lastSelectedIndex: Int?
     var scanProgressSortTask: Task<Void, Never>?
@@ -266,6 +284,44 @@ final class DiskBrowserViewModel: ObservableObject {
         return max(filteredEntries.reduce(0) { $0 + $1.size }, 1)
     }
 
+    /// Directories in the current folder whose sizes are not finished yet.
+    var hasPendingCurrentFolderChildScans: Bool {
+        guard activeSmartCollection == nil else { return false }
+        return browserListEntries.contains {
+            !$0.isVirtual && $0.isDirectory && $0.isScanning
+        }
+    }
+
+    /// Chart area should show loading until initial prep, subtree metadata, and current-folder sizing finish.
+    var isBrowserChartLoading: Bool {
+        !isInitialChartReady
+            || isChartChildrenLoading
+            || hasPendingCurrentFolderChildScans
+    }
+
+    var browserChartScanProgress: ChartChildrenScanProgress? {
+        if let chartChildrenScanProgress { return chartChildrenScanProgress }
+        return currentFolderListingChartProgress
+    }
+
+    private var currentFolderListingChartProgress: ChartChildrenScanProgress? {
+        guard hasPendingCurrentFolderChildScans else { return nil }
+        let directories = browserListEntries.filter { $0.isDirectory && !$0.isVirtual }
+        let total = directories.count
+        guard total > 0 else { return nil }
+        let completed = directories.filter { !$0.isScanning }.count
+        let currentName = directories.first(where: \.isScanning)?.name ?? ""
+        return ChartChildrenScanProgress(
+            completedFolders: completed,
+            totalFolders: total,
+            currentFolderName: currentName,
+            currentDepth: 1,
+            maxDepth: 2,
+            filesScanned: 0,
+            displayFraction: Double(completed) / Double(total)
+        )
+    }
+
     var totalSize: Int64 {
         browserListEntries.reduce(0) { $0 + $1.size }
     }
@@ -310,6 +366,6 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     var allPermissionsGranted: Bool {
-        permissions.allSatisfy(\.isGranted)
+        PermissionsService.allGranted
     }
 }

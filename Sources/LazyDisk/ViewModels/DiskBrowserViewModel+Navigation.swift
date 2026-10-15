@@ -1,6 +1,7 @@
 // DiskBrowserViewModel+Navigation.swift — Folder navigation, smart collections, and selection.
 import AppKit
 import Foundation
+import LazyDiskCore
 import SwiftUI
 
 extension DiskBrowserViewModel {
@@ -67,11 +68,16 @@ extension DiskBrowserViewModel {
                 guard generation == navigationGeneration else { return }
                 entries = cached.entries
                 invalidateAllDerivedCaches()
-                refreshChartChildrenIfNeeded()
+                if let volume = selectedVolume,
+                   await VolumeTreeScanCoordinator.shared.hasCompleteTreeScan(volumeID: volume.id) {
+                    await ensureVolumeChartMapPublished(volumeID: volume.id)
+                } else {
+                    refreshChartChildrenIfNeeded()
+                }
                 currentPath = normalized
                 isLoading = false
                 loadedFromCache = true
-                scanProgress = L10n.scanFromCache
+                scanProgress = ""
 
                 startSmartPrefetch()
 
@@ -87,8 +93,84 @@ extension DiskBrowserViewModel {
             }
 
             loadedFromCache = false
-            isLoading = true
-            scanProgress = L10n.scanFolderNamed(normalized.lastPathComponent)
+
+            if let volume = selectedVolume,
+               await scanner.canUseVolumeTreeListing(
+                   volumeID: volume.id,
+                   folder: normalized,
+                   scanRoot: volume.scanRoot
+               ) {
+                let folderPath = normalized.path
+                if let preview = await VolumeTreeScanCoordinator.shared.chartChildMap(for: volume.id)?[folderPath] {
+                    guard generation == navigationGeneration else { return }
+                    entries = sortOrder.sort(preview)
+                    invalidateAllDerivedCaches()
+                    await ensureVolumeChartMapPublished(volumeID: volume.id)
+                }
+
+                let treeListed = await scanner.folderListingFromVolumeTree(
+                    at: normalized,
+                    scanRoot: volume.scanRoot
+                )
+                guard generation == navigationGeneration else { return }
+                let sorted = sortOrder.sort(treeListed)
+                entries = sorted
+                invalidateAllDerivedCaches()
+                await ensureVolumeChartMapPublished(volumeID: volume.id)
+                isLoading = false
+                scanProgress = ""
+                loadedFromCache = true
+                await cache.set(
+                    normalized,
+                    entries: sorted,
+                    isVolumeRoot: isVolumeRoot,
+                    contentLevel: .full
+                )
+                scheduleSizeIndexPersist()
+                startSmartPrefetch()
+                return
+            }
+
+            let instant = await scanner.instantFolderListing(
+                at: normalized,
+                scanRoot: selectedVolume?.scanRoot
+            )
+            guard generation == navigationGeneration else { return }
+            let sortedInstant = sortOrder.sort(instant)
+            entries = sortedInstant
+            invalidateAllDerivedCaches()
+            refreshChartChildrenIfNeeded()
+            isLoading = false
+            scanProgress = ""
+
+            if let volume = selectedVolume,
+               await scanner.canUseVolumeTreeListing(
+                   volumeID: volume.id,
+                   folder: normalized,
+                   scanRoot: volume.scanRoot
+               ) {
+                let readyEntries = sortedInstant.map { item -> DiskItem in
+                    var copy = item
+                    if copy.isDirectory { copy.isScanning = false }
+                    return copy
+                }
+                entries = readyEntries
+                let directories = readyEntries.filter { $0.isDirectory && !$0.isVirtual }
+                let needsSizingWalk = directories.contains(where: \.isScanning)
+                if !needsSizingWalk {
+                    loadedFromCache = true
+                    scanProgress = ""
+                    await cache.set(
+                        normalized,
+                        entries: readyEntries,
+                        isVolumeRoot: isVolumeRoot,
+                        contentLevel: .full
+                    )
+                    scheduleSizeIndexPersist()
+                    startSmartPrefetch()
+                    return
+                }
+            }
 
             await performScan(
                 at: normalized,
@@ -98,8 +180,6 @@ extension DiskBrowserViewModel {
                 generation: generation
             )
             guard !Task.isCancelled, generation == navigationGeneration else { return }
-            isLoading = false
-            scanProgress = ""
 
             startSmartPrefetch()
         }

@@ -18,19 +18,103 @@ private final class PartialPublishGate: @unchecked Sendable {
 
 extension DiskBrowserViewModel {
     func refreshChartChildrenIfNeeded() {
+        guard isInitialChartReady, !isGatedSplashVolumeScan else { return }
         guard chartStyle == .sunburst else { return }
-        if isAtVolumeRoot {
-            Task { await refreshVolumeRootChartFromCache() }
+        if let volume = selectedVolume {
+            Task {
+                if await VolumeTreeScanCoordinator.shared.hasCompleteTreeScan(volumeID: volume.id) {
+                    await ensureVolumeChartMapPublished(volumeID: volume.id)
+                    return
+                }
+                if isAtVolumeRoot {
+                    await refreshVolumeRootChartFromCache()
+                    return
+                }
+                await MainActor.run { refreshChartChildren() }
+            }
             return
         }
         refreshChartChildren()
     }
 
+    /// Publishes the prebuilt volume chart map (instant navigation, DaisyDisk-style).
+    func ensureVolumeChartMapPublished(volumeID: String) async {
+        guard chartStyle == .sunburst else { return }
+
+        if let stored = await VolumeTreeScanCoordinator.shared.chartChildMap(for: volumeID),
+           !stored.isEmpty {
+            isChartChildrenLoading = false
+            chartChildrenScanProgress = nil
+            if chartChildMap != stored {
+                publishChartChildMap(stored)
+            }
+            return
+        }
+
+        if isAtVolumeRoot {
+            await refreshVolumeRootChartFromCache()
+        } else {
+            await publishChartFromCurrentEntries()
+        }
+    }
+
+    func storeVolumeChartChildMap(
+        volumeID: String,
+        buildResult: ChartTreeBuilder.BuildResult,
+        root: URL,
+        listedEntries: [DiskItem]
+    ) async {
+        let map = ChartTreeBuilder.childMap(
+            from: buildResult,
+            root: root,
+            listedEntries: listedEntries,
+            maxChildrenPerNode: chartMaxChildrenPerNode,
+            otherItemName: L10n.filterOther
+        )
+        await VolumeTreeScanCoordinator.shared.storeChartChildMap(volumeID: volumeID, map: map)
+    }
+
+    /// Sunburst ring for the current folder using listed entries (no subtree file walk).
+    func publishChartFromCurrentEntries() async {
+        guard chartStyle == .sunburst, let root = currentPath else {
+            clearChartChildMap()
+            isChartChildrenLoading = false
+            chartChildrenScanProgress = nil
+            return
+        }
+
+        chartChildRefreshTask?.cancel()
+        let parentPath = PathUtils.resolved(root).path
+        let listed = entries
+        let maxChildren = chartMaxChildrenPerNode
+        let items = listed
+            .filter { !$0.isVirtual && ($0.size > 0 || $0.isDirectory) }
+            .sorted { $0.size > $1.size }
+            .prefix(maxChildren)
+
+        isChartChildrenLoading = false
+        chartChildrenScanProgress = nil
+        if items.isEmpty {
+            clearChartChildMap()
+        } else {
+            publishChartChildMap([parentPath: Array(items)])
+        }
+    }
+
     func refreshVolumeRootChartFromCache() async {
         guard chartStyle == .sunburst,
               isAtVolumeRoot,
-              let scanRoot = selectedVolume?.scanRoot else { return }
+              let volume = selectedVolume else { return }
 
+        if let stored = await VolumeTreeScanCoordinator.shared.chartChildMap(for: volume.id),
+           !stored.isEmpty {
+            isChartChildrenLoading = false
+            chartChildrenScanProgress = nil
+            publishChartChildMap(stored)
+            return
+        }
+
+        let scanRoot = volume.scanRoot
         let maxDepth = await highestFullyCachedScanDepth(scanRoot: scanRoot)
         guard maxDepth >= 1 else {
             refreshChartChildren()
@@ -98,7 +182,8 @@ extension DiskBrowserViewModel {
     }
 
     func highestFullyCachedScanDepth(scanRoot: URL) async -> Int {
-        for depth in (1...4).reversed() {
+        let limit = initialChartPrefetchMaxDepth
+        for depth in (1...limit).reversed() {
             if await isScanDepthFullyCached(depth, scanRoot: scanRoot) {
                 return depth
             }
@@ -127,6 +212,21 @@ extension DiskBrowserViewModel {
             return
         }
 
+        if let volume = selectedVolume {
+            Task {
+                if await VolumeTreeScanCoordinator.shared.hasCompleteTreeScan(volumeID: volume.id) {
+                    await publishChartFromCurrentEntries()
+                    return
+                }
+                await MainActor.run { beginChartChildrenFileWalk() }
+            }
+            return
+        }
+
+        beginChartChildrenFileWalk()
+    }
+
+    private func beginChartChildrenFileWalk() {
         chartChildRefreshTask?.cancel()
 
         guard let root = currentPath ?? selectedVolume?.scanRoot else {
@@ -145,15 +245,12 @@ extension DiskBrowserViewModel {
 
         isChartChildrenLoading = true
 
-        chartChildRefreshTask = Task.detached(priority: .utility) { [weak self] in
+        chartChildRefreshTask = Task.detached(priority: .utility) { [weak capturedViewModel = self] in
             try? await Task.sleep(nanoseconds: 16_000_000)
             guard !Task.isCancelled else { return }
+            guard let viewModel = capturedViewModel else { return }
 
-            let listedEntries = await MainActor.run { () -> [DiskItem]? in
-                guard let self else { return nil }
-                return self.entries
-            }
-            guard let listedEntries else { return }
+            let listedEntries = await MainActor.run { viewModel.entries }
 
             let topLevelDirs = Set(
                 listedEntries
@@ -162,8 +259,8 @@ extension DiskBrowserViewModel {
             )
             let expandedParents = expandedParents.union(topLevelDirs)
 
-            await MainActor.run { [weak self] in
-                self?.chartChildrenScanProgress = ChartChildrenScanProgress(
+            await MainActor.run {
+                viewModel.chartChildrenScanProgress = ChartChildrenScanProgress(
                     completedFolders: 0,
                     totalFolders: 0,
                     currentFolderName: rootName,
@@ -177,6 +274,7 @@ extension DiskBrowserViewModel {
             let partialPublishGate = PartialPublishGate()
 
             let prefs = await MainActor.run { AppPreferences.load() }
+            let cancelCheck = await MainActor.run { viewModel.activeScanCancelHandler() }
 
             let buildResult = ChartTreeBuilder.build(
                 at: root,
@@ -189,7 +287,7 @@ extension DiskBrowserViewModel {
                     fileSizeThreshold: 0,
                     parallelism: prefs.scanParallelism
                 ),
-                shouldCancel: { Task.isCancelled },
+                shouldCancel: cancelCheck,
                 onPartial: { partial in
                     let fraction = ChartScanProgressMath.metadataTreeFraction(filesScanned: partial.filesScanned)
 
@@ -206,17 +304,8 @@ extension DiskBrowserViewModel {
 
                     guard partialPublishGate.shouldPublish() else { return }
 
-                    let snapshot = ChartTreeBuilder.childMap(
-                        from: partial,
-                        root: root,
-                        listedEntries: listedEntries,
-                        maxChildrenPerNode: maxChildrenPerNode,
-                        otherItemName: otherName
-                    )
-
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
-                        self.chartChildrenScanProgress = ChartChildrenScanProgress(
+                    Task { @MainActor [viewModel] in
+                        viewModel.chartChildrenScanProgress = ChartChildrenScanProgress(
                             completedFolders: 0,
                             totalFolders: 0,
                             currentFolderName: rootName,
@@ -224,12 +313,10 @@ extension DiskBrowserViewModel {
                             maxDepth: maxDepth + 1,
                             filesScanned: partial.filesScanned,
                             displayFraction: max(
-                                self.chartChildrenScanProgress?.displayFraction ?? 0,
+                                viewModel.chartChildrenScanProgress?.displayFraction ?? 0,
                                 fraction
                             )
                         )
-                        self.chartDeferredByParent = partial.deferredByParent
-                        self.publishChartChildMap(snapshot)
                     }
                 }
             )
@@ -244,13 +331,12 @@ extension DiskBrowserViewModel {
                 otherItemName: otherName
             )
 
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.isChartChildrenLoading = false
-                self.chartChildrenScanProgress = nil
-                self.chartDeferredByParent = buildResult.deferredByParent
-                self.publishChartChildMap(finalMap)
-                self.startSmartPrefetch(chartMap: finalMap)
+            await MainActor.run {
+                viewModel.isChartChildrenLoading = false
+                viewModel.chartChildrenScanProgress = nil
+                viewModel.chartDeferredByParent = buildResult.deferredByParent
+                viewModel.publishChartChildMap(finalMap)
+                viewModel.startSmartPrefetch(chartMap: finalMap)
             }
         }
     }
@@ -260,7 +346,20 @@ extension DiskBrowserViewModel {
         root: URL,
         listedEntries: [DiskItem]
     ) {
+        if isGatedSplashVolumeScan {
+            pendingFusedVolumeChart = (buildResult, root, listedEntries)
+            chartDeferredByParent = buildResult.deferredByParent
+            return
+        }
         chartDeferredByParent = buildResult.deferredByParent
+        if let volumeID = selectedVolume?.id {
+            Task { await storeVolumeChartChildMap(
+                volumeID: volumeID,
+                buildResult: buildResult,
+                root: root,
+                listedEntries: listedEntries
+            ) }
+        }
         let map = ChartTreeBuilder.childMap(
             from: buildResult,
             root: root,

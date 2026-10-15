@@ -6,6 +6,32 @@ import SwiftUI
 extension DiskBrowserViewModel {
     // MARK: - Permissions
 
+    var privacyGatePermissions: [PermissionItem] {
+        permissions.filter { $0.kind.isPrivacyGate }
+    }
+
+    var requiredPermissions: [PermissionItem] {
+        permissions.filter { $0.kind != .adminHelper }
+    }
+
+    var requiredPermissionsCount: Int {
+        requiredPermissions.count
+    }
+
+    var requiredPermissionsGrantedCount: Int {
+        requiredPermissions.filter(\.isGranted).count
+    }
+
+    func displaysPermissionAsGranted(_ permission: PermissionItem) -> Bool {
+        if permission.isGranted { return true }
+        if permission.kind == .adminHelper, hasFullDiskAccessPermission { return true }
+        return false
+    }
+
+    private var hasFullDiskAccessPermission: Bool {
+        permissions.first(where: { $0.kind == .fullDiskAccess })?.isGranted == true
+    }
+
     func refreshPermissions() {
         permissions = PermissionsService.checkAll()
     }

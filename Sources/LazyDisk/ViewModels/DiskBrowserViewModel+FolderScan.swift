@@ -1,6 +1,7 @@
 // DiskBrowserViewModel+FolderScan.swift — Per-folder scan, lazy content, and smart prefetch.
 import AppKit
 import Foundation
+import LazyDiskCore
 import SwiftUI
 
 extension DiskBrowserViewModel {
@@ -11,39 +12,87 @@ extension DiskBrowserViewModel {
         volume: VolumeInfo?,
         isVolumeRoot: Bool,
         trackDetailedProgress: Bool,
-        generation: UInt? = nil
+        generation: UInt? = nil,
+        shouldCancel: (@Sendable () -> Bool)? = nil
     ) async {
         let normalized = PathUtils.resolved(url)
 
         guard generation == nil || generation == navigationGeneration else { return }
 
+        let cancelCheck = shouldCancel ?? activeScanCancelHandler()
+
+        if isVolumeRoot {
+            await RestrictedScanCoordinator.shared.clear()
+            restrictedScanEvents = []
+        }
+
         currentPath = normalized
-        isLoading = true
+
+        if !isVolumeRoot,
+           let volume,
+           await scanner.canUseVolumeTreeListing(
+               volumeID: volume.id,
+               folder: normalized,
+               scanRoot: volume.scanRoot
+           ) {
+            let treeListed = await scanner.folderListingFromVolumeTree(
+                at: normalized,
+                scanRoot: volume.scanRoot
+            )
+            guard generation == nil || generation == navigationGeneration else { return }
+            let sorted = sortOrder.sort(treeListed)
+            entries = sorted
+            invalidateAllDerivedCaches()
+            refreshChartChildrenIfNeeded()
+            await cache.set(
+                normalized,
+                entries: sorted,
+                isVolumeRoot: isVolumeRoot,
+                contentLevel: .full
+            )
+            scheduleSizeIndexPersist()
+            return
+        }
 
         if trackDetailedProgress {
-            scanProgressFraction = 0.05
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.preparing(
+                    fraction: 1,
+                    published: scanProgressFraction
+                )
+            } else {
+                scanProgressFraction = max(scanProgressFraction, 0.05)
+            }
             scanProgress = L10n.scanReadingList
             scanCurrentFolder = url.lastPathComponent.isEmpty ? "/" : url.lastPathComponent
         }
 
-        let listed = await scanner.listDirectory(at: normalized)
+        let listed = trackDetailedProgress
+            ? await scanner.listDirectory(at: normalized)
+            : await scanner.listDirectoryLight(at: normalized)
         guard !Task.isCancelled, generation == nil || generation == navigationGeneration else { return }
 
-        entries = listed
+        entries = await scanner.itemsWithIndexedSizes(listed)
         invalidateAllDerivedCaches()
         if !isVolumeRoot || !trackDetailedProgress {
             refreshChartChildrenIfNeeded()
         }
 
         if trackDetailedProgress {
-            scanProgressFraction = 0.1
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.listed(published: scanProgressFraction)
+            } else {
+                scanProgressFraction = 0.1
+            }
             scanProgress = L10n.scanFoundItems(listed.count)
         }
 
         let prefs = AppPreferences.load()
         let sizingConfiguration = prefs.sizingConfiguration()
-        let parallelism = prefs.scanParallelism
-        let useFusedVolumeScan = isVolumeRoot && trackDetailedProgress && chartStyle == .sunburst
+        let parallelism = isVolumeRoot && trackDetailedProgress
+            ? max(prefs.scanParallelism, NativeScanRuntime.daisyDefaultWorkers)
+            : prefs.scanParallelism
+        let useFusedVolumeScan = isVolumeRoot && trackDetailedProgress && NativeDirectoryScanner.isAvailable
 
         let scanned: [DiskItem]
         var fusedChartResult: ChartTreeBuilder.BuildResult?
@@ -52,6 +101,10 @@ extension DiskBrowserViewModel {
             let chartDepth = interfaceMode == .simple
                 ? SunburstLayoutEngine.Config.daisyDisk.maxDepth
                 : SunburstLayoutEngine.Config.standard.maxDepth
+            let splashReadyHandler = makeVolumeSplashReadyHandler(
+                volume: volume,
+                listedEntries: listed
+            )
             let fused = await scanner.fusedVolumeRootScan(
                 parent: normalized,
                 items: listed,
@@ -59,29 +112,35 @@ extension DiskBrowserViewModel {
                 skipHiddenFiles: !prefs.showHiddenFiles,
                 parallelism: parallelism,
                 configuration: sizingConfiguration,
+                shouldCancel: cancelCheck,
                 onProgress: { [weak self] update in
                     DispatchQueue.main.async {
                         self?.publishScanProgress(
                             update,
                             trackDetailedProgress: trackDetailedProgress,
+                            responsiveUI: !trackDetailedProgress,
                             generation: generation
                         )
                     }
-                }
+                },
+                onSplashReady: splashReadyHandler
             )
             scanned = fused.items
             fusedChartResult = fused.chartResult
+            await RestrictedScanRegistrar.recordWalk(fused.sizingWalk)
         } else {
             scanned = await scanner.scanDirectorySizes(
                 items: listed,
                 parent: normalized,
                 configuration: sizingConfiguration,
-                parallelism: parallelism
+                parallelism: parallelism,
+                shouldCancel: cancelCheck
             ) { [weak self] update in
                 DispatchQueue.main.async {
                     self?.publishScanProgress(
                         update,
                         trackDetailedProgress: trackDetailedProgress,
+                        responsiveUI: !trackDetailedProgress,
                         generation: generation
                     )
                 }
@@ -93,7 +152,14 @@ extension DiskBrowserViewModel {
         var sorted = sortOrder.sort(scanned)
 
         if trackDetailedProgress {
-            scanProgressFraction = 0.88
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.finalizing(
+                    subPhase: 0.35,
+                    published: scanProgressFraction
+                )
+            } else {
+                scanProgressFraction = 0.88
+            }
             scanProgress = L10n.scanFinalizing
         }
 
@@ -114,6 +180,10 @@ extension DiskBrowserViewModel {
         } else if isVolumeRoot && trackDetailedProgress {
             refreshChartChildrenIfNeeded()
         }
+
+        if isVolumeRoot, trackDetailedProgress, fusedChartResult != nil {
+            await refreshChartFromScanCache(maxScanDepth: SunburstLayoutEngine.Config.daisyDisk.maxDepth)
+        }
         await cache.set(
             normalized,
             entries: sorted,
@@ -122,8 +192,34 @@ extension DiskBrowserViewModel {
         )
         scheduleSizeIndexPersist()
 
+        if let fusedChartResult {
+            lastScanMetrics = fusedChartResult.scanMetrics
+        } else {
+            await refreshScanMetricsForCurrentFolder()
+        }
+
+        if isVolumeRoot {
+            await reconcileRestrictedPathsAfterScan()
+            let restrictedRemaining = await RestrictedScanCoordinator.shared.allEvents()
+            if restrictedRemaining.isEmpty, let volume, fusedChartResult != nil {
+                await VolumeTreeScanCoordinator.shared.markComplete(
+                    volumeID: volume.id,
+                    scanRoot: volume.scanRoot
+                )
+            } else if !restrictedRemaining.isEmpty, let volume {
+                await VolumeTreeScanCoordinator.shared.clear(volumeID: volume.id)
+            }
+        }
+
         if trackDetailedProgress {
-            scanProgressFraction = 0.92
+            if isGatedSplashVolumeScan {
+                scanProgressFraction = VolumeSplashProgressPhases.finalizing(
+                    subPhase: 1,
+                    published: scanProgressFraction
+                )
+            } else {
+                scanProgressFraction = 0.92
+            }
             scanProgress = L10n.scanCaching
         }
     }

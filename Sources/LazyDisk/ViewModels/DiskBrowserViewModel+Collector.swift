@@ -78,7 +78,11 @@ extension DiskBrowserViewModel {
     func requestCollectorDelete() {
         guard !collectorItems.isEmpty else { return }
         pendingDeleteURLs = collectorItems.map(\.url)
-        deleteWarnings = DeleteWarningService.analyze(urls: pendingDeleteURLs)
+        deleteWarnings = DeleteWarningService.analyze(
+            urls: pendingDeleteURLs,
+            volumePurgeableBytes: selectedVolume?.purgeableCapacity,
+            volumeTotalBytes: selectedVolume?.totalCapacity
+        )
         showDeleteConfirmation = true
     }
 

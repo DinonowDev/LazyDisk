@@ -1,6 +1,7 @@
 // DiskBrowserViewModel+Filesystem.swift — Live filesystem change monitoring.
 import AppKit
 import Foundation
+import LazyDiskCore
 import SwiftUI
 
 extension DiskBrowserViewModel {
@@ -45,7 +46,7 @@ extension DiskBrowserViewModel {
         guard let volume = selectedVolume else { return }
 
         let watchPath = PathUtils.resolved(volume.scanRoot).path
-        fsMonitor.start(watchPaths: [watchPath], latency: 0.3) { [weak self] changedPaths in
+        fsMonitor.start(watchPaths: [watchPath], latency: 0.15) { [weak self] changedPaths in
             Task { @MainActor in
                 self?.handleFilesystemChange(changedPaths: changedPaths)
             }
@@ -55,7 +56,7 @@ extension DiskBrowserViewModel {
     func handleFilesystemChange(changedPaths: [String]) {
         fsRefreshTask?.cancel()
         fsRefreshTask = Task {
-            try? await Task.sleep(nanoseconds: 400_000_000)
+            try? await Task.sleep(nanoseconds: 150_000_000)
             guard !Task.isCancelled else { return }
             await refreshVolumeStatsAndAffectedEntries(changedPaths: changedPaths)
         }
@@ -83,10 +84,38 @@ extension DiskBrowserViewModel {
         let volumeID = selectedVolume?.id
         for path in changedPaths {
             await SizeIndexCoordinator.shared.invalidate(prefix: path, volumeID: volumeID)
+            await DirectorySizeIndex.shared.invalidate(prefix: path)
             await cache.invalidate(URL(fileURLWithPath: path, isDirectory: true))
         }
 
+        await applyVisibleDirectoryRefresh()
+
         guard let volume = selectedVolume else { return }
+        let configuration = AppPreferences.load().sizingConfiguration()
+
+        let directoriesToRescan = Set(
+            changedPaths.compactMap { path -> URL? in
+                var isDir: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+                    return URL(fileURLWithPath: path, isDirectory: true).deletingLastPathComponent()
+                }
+                return URL(fileURLWithPath: path, isDirectory: true)
+            }
+            .filter { PathUtils.isWithinVolume($0, scanRoot: volume.scanRoot) }
+            .map { PathUtils.resolved($0).path }
+        )
+
+        for dirPath in directoriesToRescan {
+            guard !Task.isCancelled else { return }
+            let url = URL(fileURLWithPath: dirPath, isDirectory: true)
+            _ = await DirectorySizeIndex.shared.rescanSubtree(
+                at: url,
+                configuration: configuration
+            )
+        }
+
+        await applyVisibleDirectoryRefresh()
+
         let normalized = PathUtils.resolved(currentPath)
         await performIncrementalScan(
             at: normalized,
@@ -94,6 +123,20 @@ extension DiskBrowserViewModel {
             isVolumeRoot: isAtVolumeRoot,
             trackDetailedProgress: false
         )
+    }
+
+    /// Re-reads the open folder and reapplies indexed sizes (fast path for FSEvents).
+    func applyVisibleDirectoryRefresh() async {
+        guard let currentPath, let volume = selectedVolume else { return }
+
+        let normalized = PathUtils.resolved(currentPath)
+        let listed = await scanner.listDirectory(at: normalized)
+        var sized = await scanner.itemsWithIndexedSizes(listed, scanRoot: volume.scanRoot)
+        sized = sortOrder.sort(sized)
+
+        entries = sized
+        invalidateAllDerivedCaches()
+        refreshChartChildrenIfNeeded()
     }
 
 }

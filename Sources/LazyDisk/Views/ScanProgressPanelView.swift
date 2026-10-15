@@ -8,8 +8,6 @@ struct ScanProgressPanelView: View {
     var detail: String?
     var onCancel: (() -> Void)?
 
-    @State private var animatedFraction: Double = 0
-
     private var clampedFraction: Double {
         min(max(fraction, 0), 1)
     }
@@ -45,7 +43,7 @@ struct ScanProgressPanelView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(10, geo.size.width * animatedFraction), height: 10)
+                        .frame(width: max(10, geo.size.width * clampedFraction), height: 10)
                 }
             }
             .frame(height: 10)
@@ -84,14 +82,7 @@ struct ScanProgressPanelView: View {
                 .shadow(color: .black.opacity(0.05), radius: 12, y: 4)
         )
         .padding(.horizontal, 40)
-        .onAppear {
-            animatedFraction = clampedFraction
-        }
-        .onChange(of: fraction) { newValue in
-            withAnimation(.linear(duration: 0.28)) {
-                animatedFraction = min(max(newValue, 0), 1)
-            }
-        }
+        .animation(.linear(duration: 0.25), value: clampedFraction)
     }
 }
 

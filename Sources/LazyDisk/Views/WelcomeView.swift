@@ -2,7 +2,6 @@ import SwiftUI
 
 struct WelcomeView: View {
     @EnvironmentObject var viewModel: DiskBrowserViewModel
-
     var body: some View {
         ZStack {
             background
@@ -110,18 +109,21 @@ struct WelcomeView: View {
     }
 
     private var actionButtons: some View {
-        Button { viewModel.showPermissions() } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.right").font(.system(size: 14, weight: .semibold))
-                Text(L10n.continueBtn).font(.system(size: 15, weight: .semibold))
+        VStack(spacing: 12) {
+            Button { viewModel.showPermissions() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.right").font(.system(size: 14, weight: .semibold))
+                    Text(L10n.continueBtn).font(.system(size: 15, weight: .semibold))
+                }
+                .frame(maxWidth: 320)
+                .padding(.vertical, 13)
             }
-            .frame(maxWidth: 320)
-            .padding(.vertical, 13)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(viewModel.selectedVolume == nil)
+            .keyboardShortcut(.defaultAction)
+
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(viewModel.selectedVolume == nil)
-        .keyboardShortcut(.defaultAction)
     }
 
     private var footerHint: some View {

@@ -14,6 +14,33 @@ actor DiskScanner {
         await listDirectory(at: url, light: true)
     }
 
+    /// Applies cached subtree sizes so the folder list can render before a full walk finishes.
+    func itemsWithIndexedSizes(_ items: [DiskItem], scanRoot: URL? = nil) async -> [DiskItem] {
+        let snapshot = await DirectorySizeIndex.shared.sizesSnapshot()
+        return items.map { item in
+            var copy = item
+            let resolvedSize: Int64?
+            if let scanRoot {
+                resolvedSize = PathUtils.directorySize(in: snapshot, itemURL: item.url, scanRoot: scanRoot)
+            } else {
+                let path = PathUtils.resolved(item.url).path
+                resolvedSize = snapshot[path]
+            }
+            if let size = resolvedSize, size > 0 {
+                copy.size = size
+                if copy.isDirectory {
+                    copy.isScanning = false
+                }
+            }
+            return copy
+        }
+    }
+
+    func instantFolderListing(at url: URL, scanRoot: URL? = nil) async -> [DiskItem] {
+        let listed = await listDirectoryLight(at: url)
+        return await itemsWithIndexedSizes(listed, scanRoot: scanRoot)
+    }
+
     func scanFolderContents(
         at url: URL,
         light: Bool = false,
@@ -55,6 +82,7 @@ actor DiskScanner {
         parent: URL? = nil,
         configuration: DirectorySizeWalker.Configuration? = nil,
         parallelism: Int = 6,
+        shouldCancel: (@Sendable () -> Bool)? = nil,
         onProgress: (@Sendable (ScanProgressUpdate) -> Void)? = nil
     ) async -> [DiskItem] {
         let resolvedParent = parent.map(PathUtils.resolved(_:))
@@ -76,6 +104,7 @@ actor DiskScanner {
                 parent: resolvedParent,
                 items: items,
                 configuration: sizingConfiguration,
+                shouldCancel: shouldCancel,
                 onPartial: { walk in
                     partialHolder.items = DirectorySizeWalker.applyPartialSizes(to: items, walkResult: walk)
                     let latestPartial = partialHolder.items
@@ -169,5 +198,6 @@ actor DiskScanner {
 
     func clearSizeCache() async {
         await DirectorySizeIndex.shared.clear()
+        await VolumeTreeScanCoordinator.shared.clear(volumeID: nil)
     }
 }

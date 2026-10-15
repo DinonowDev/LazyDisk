@@ -3,11 +3,10 @@ import SwiftUI
 struct DeleteConfirmationSheet: View {
     @EnvironmentObject var viewModel: DiskBrowserViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var emptyTrashAfterDelete = false
 
     private var itemCount: Int { viewModel.pendingDeleteURLs.count }
-    private var totalSize: Int64 {
-        viewModel.pendingDeleteURLs.isEmpty ? viewModel.selectedSize : viewModel.collectorSize
-    }
+    private var totalSize: Int64 { viewModel.pendingDeleteTotalSize }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -18,6 +17,15 @@ struct DeleteConfirmationSheet: View {
                 safeDeleteBody
             } else {
                 warningBody
+            }
+
+            if itemCount > 1 {
+                Toggle(isOn: $emptyTrashAfterDelete) {
+                    Text(L10n.deleteEmptyTrashOption)
+                        .font(.system(size: 12))
+                }
+                .toggleStyle(.checkbox)
+                .padding(.top, 8)
             }
 
             Divider().padding(.vertical, 16)
@@ -119,7 +127,7 @@ struct DeleteConfirmationSheet: View {
             Spacer()
 
             Button {
-                viewModel.confirmDelete()
+                viewModel.confirmDelete(emptyTrashAfterward: emptyTrashAfterDelete)
                 dismiss()
             } label: {
                 Label(L10n.deleteAction, systemImage: "trash.fill")

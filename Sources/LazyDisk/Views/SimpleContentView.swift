@@ -19,18 +19,18 @@ struct SimpleContentView: View {
         return name.isEmpty ? path.path : name
     }
 
-    private var showSunburstLoading: Bool {
-        viewModel.chartStyle == .sunburst && viewModel.isChartChildrenLoading
-    }
-
-    /// Progressive sunburst preview while deeper rings are still loading.
-    private var showsChartPreviewWhileLoading: Bool {
-        showSunburstLoading
+    private var showChartLoadingOverlay: Bool {
+        viewModel.isBrowserChartLoading
     }
 
     private var showsSunburstChart: Bool {
         guard viewModel.chartStyle == .sunburst else { return false }
-        return !viewModel.sunburstSegments.isEmpty || showsChartPreviewWhileLoading
+        guard !showChartLoadingOverlay else { return false }
+        return !viewModel.sunburstSegments.isEmpty
+    }
+
+    private var showsRoseChart: Bool {
+        viewModel.chartStyle != .sunburst
     }
 
     var body: some View {
@@ -85,7 +85,7 @@ struct SimpleContentView: View {
         }
         .task(id: chartChildrenRefreshKey) {
             if viewModel.chartStyle == .sunburst {
-                viewModel.refreshChartChildren()
+                viewModel.refreshChartChildrenIfNeeded()
             }
         }
     }
@@ -114,17 +114,16 @@ struct SimpleContentView: View {
                         onAddToCollector: { viewModel.addToCollector($0) }
                     )
                     .padding(24)
-                    .opacity(showsChartPreviewWhileLoading ? 0.28 : 1)
-                    .allowsHitTesting(!showSunburstLoading)
+                    .allowsHitTesting(!showChartLoadingOverlay)
                 }
 
-                if showSunburstLoading {
+                if showChartLoadingOverlay {
                     ChartChildrenScanOverlay(
                         totalSize: viewModel.displayTotalSize,
-                        progress: viewModel.chartChildrenScanProgress
+                        progress: viewModel.browserChartScanProgress
                     )
                 }
-            } else {
+            } else if showsRoseChart {
                 RoseChartView(
                     items: viewModel.chartItems,
                     totalSize: viewModel.displayTotalSize,
@@ -136,12 +135,25 @@ struct SimpleContentView: View {
                     onAddToCollector: { viewModel.addToCollector($0) }
                 )
                 .padding(24)
+                .allowsHitTesting(!showChartLoadingOverlay)
+
+                if showChartLoadingOverlay {
+                    ChartChildrenScanOverlay(
+                        totalSize: viewModel.displayTotalSize,
+                        progress: viewModel.browserChartScanProgress
+                    )
+                }
+            } else if showChartLoadingOverlay {
+                ChartChildrenScanOverlay(
+                    totalSize: viewModel.displayTotalSize,
+                    progress: viewModel.browserChartScanProgress
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .animation(.easeInOut(duration: 0.25), value: viewModel.chartStyle)
-        .animation(.easeInOut(duration: 0.2), value: showSunburstLoading)
+        .animation(.easeInOut(duration: 0.2), value: showChartLoadingOverlay)
     }
 
     private var chartBackground: some View {

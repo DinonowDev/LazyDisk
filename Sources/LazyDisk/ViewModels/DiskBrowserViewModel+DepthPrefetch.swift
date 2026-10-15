@@ -3,21 +3,19 @@ import Foundation
 import LazyDiskCore
 
 extension DiskBrowserViewModel {
-    /// Prefetch depths 1–2 before the app becomes ready (volume root is depth 0).
-    func prefetchInitialDepthLevels(scanRoot: URL) async {
-        await prefetchDepthRange(1...2, scanRoot: scanRoot, trackProgress: true)
-        await refreshChartFromScanCache(maxScanDepth: 2)
-    }
-
-    /// After the first screen is ready, prefetch depths 3 then 4 in the background.
+    /// After the first screen is ready, prefetch deeper folders for faster drill-down.
     func startBackgroundDepthPrefetch(scanRoot: URL) {
         depthPrefetchTask?.cancel()
         let volumeID = selectedVolume?.id
         let rootEntries = entries
+        let displayDepth = initialChartPrefetchMaxDepth
+        let deepStart = displayDepth + 1
+        let deepEnd = displayDepth + 4
+        guard deepStart <= deepEnd else { return }
 
         depthPrefetchTask = Task.detached(priority: .utility) { [weak self] in
             await self?.prefetchDepthRangeDetached(
-                3...4,
+                deepStart...deepEnd,
                 scanRoot: scanRoot,
                 rootEntries: rootEntries,
                 volumeID: volumeID,
@@ -110,7 +108,7 @@ extension DiskBrowserViewModel {
 
             if !trackProgress {
                 await MainActor.run { [weak self] in
-                    guard let self else { return }
+                    guard let self, self.isInitialChartReady else { return }
                     Task { await self.refreshChartFromScanCache(maxScanDepth: depth) }
                 }
             }

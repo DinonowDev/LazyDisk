@@ -2,7 +2,11 @@ import AppKit
 import Foundation
 
 enum DeleteWarningService {
-    static func analyze(urls: [URL]) -> [DeleteWarning] {
+    static func analyze(
+        urls: [URL],
+        volumePurgeableBytes: Int64? = nil,
+        volumeTotalBytes: Int64? = nil
+    ) -> [DeleteWarning] {
         var warnings: [DeleteWarning] = []
 
         let iosBackup = urls.filter { DeletePathAnalyzer.isIOSBackup($0) }
@@ -59,6 +63,27 @@ enum DeleteWarningService {
             warnings.append(DeleteWarning(
                 title: L10n.warnBulkDeleteTitle,
                 message: L10n.warnBulkDeleteMsg(urls.count),
+                severity: .info,
+                paths: []
+            ))
+        }
+
+        let cloudItems = urls.filter { DeletePathAnalyzer.isCloudPlaceholder($0) }
+        if !cloudItems.isEmpty {
+            warnings.append(DeleteWarning(
+                title: L10n.warnCloudPlaceholderTitle,
+                message: L10n.warnCloudPlaceholderMsg,
+                severity: .caution,
+                paths: cloudItems.map(\.path)
+            ))
+        }
+
+        if let purgeable = volumePurgeableBytes,
+           let total = volumeTotalBytes,
+           DeletePathAnalyzer.shouldWarnPurgeableVolume(purgeableBytes: purgeable, totalBytes: total) {
+            warnings.append(DeleteWarning(
+                title: L10n.warnPurgeableVolumeTitle,
+                message: L10n.warnPurgeableVolumeMsg,
                 severity: .info,
                 paths: []
             ))

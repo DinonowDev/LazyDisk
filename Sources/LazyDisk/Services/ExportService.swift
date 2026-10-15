@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import LazyDiskCore
 
 enum ExportService {
     static func exportCSV(entries: [DiskItem], to url: URL) throws {
@@ -18,7 +19,12 @@ enum ExportService {
         try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 
-    static func exportJSON(entries: [DiskItem], to url: URL) throws {
+    static func exportJSON(
+        entries: [DiskItem],
+        to url: URL,
+        scanMetrics: NativeScanMetrics? = nil,
+        folderPath: String? = nil
+    ) throws {
         struct ExportRow: Codable {
             let name: String
             let path: String
@@ -27,14 +33,36 @@ enum ExportService {
             let modified: Date?
         }
 
+        struct ScanMetricsExport: Codable {
+            let cloneBytesMerged: Int64
+            let cloneGroupsMerged: Int32
+            let hardlinkFilesSkipped: Int64
+        }
+
+        struct ExportDocument: Codable {
+            let folderPath: String?
+            let scanMetrics: ScanMetricsExport?
+            let entries: [ExportRow]
+        }
+
         let rows = entries.filter { !$0.isVirtual }.map {
             ExportRow(name: $0.name, path: $0.url.path, size: $0.size, kind: $0.fileKind.rawValue, modified: $0.modifiedDate)
         }
 
+        let metricsPayload = scanMetrics.map {
+            ScanMetricsExport(
+                cloneBytesMerged: $0.cloneBytesMerged,
+                cloneGroupsMerged: $0.cloneGroupsMerged,
+                hardlinkFilesSkipped: $0.hardlinkFilesSkipped
+            )
+        }
+
+        let document = ExportDocument(folderPath: folderPath, scanMetrics: metricsPayload, entries: rows)
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(rows)
+        let data = try encoder.encode(document)
         try data.write(to: url)
     }
 

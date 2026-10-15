@@ -16,6 +16,7 @@ struct PermissionsView: View {
                 VStack(spacing: 0) {
                     header.padding(.bottom, 28)
                     permissionsList
+                    if showFullDiskTargetHint { fullDiskTargetHint.padding(.top, 16) }
                     if showTerminalHint { terminalHint.padding(.top, 16) }
                     actionButtons.padding(.top, 28)
                 }
@@ -29,11 +30,21 @@ struct PermissionsView: View {
         .onAppear { viewModel.refreshPermissionsDeferred() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             viewModel.refreshPermissionsDeferred()
+            Task {
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                await MainActor.run { viewModel.refreshPermissions() }
+            }
         }
     }
 
     private var showTerminalHint: Bool {
         !PermissionsService.isRunningAsAppBundle && !allGranted
+    }
+
+    private var showFullDiskTargetHint: Bool {
+        guard PermissionsService.isRunningAsAppBundle else { return false }
+        guard let fullDisk = viewModel.permissions.first(where: { $0.kind == .fullDiskAccess }) else { return true }
+        return !viewModel.displaysPermissionAsGranted(fullDisk)
     }
 
     private var header: some View {
@@ -55,8 +66,11 @@ struct PermissionsView: View {
 
     private var permissionsList: some View {
         VStack(spacing: 8) {
-            ForEach(viewModel.permissions) { permission in
-                PermissionRow(permission: permission)
+            ForEach(viewModel.privacyGatePermissions) { permission in
+                PermissionRow(
+                    permission: permission,
+                    displaysAsGranted: viewModel.displaysPermissionAsGranted(permission)
+                )
             }
 
             HStack {
@@ -64,7 +78,7 @@ struct PermissionsView: View {
                     .foregroundStyle(allGranted ? .green : .orange)
                 Text(allGranted
                      ? L10n.permReadyScan
-                     : L10n.permGrantedCount(viewModel.permissions.filter(\.isGranted).count, viewModel.permissions.count))
+                     : L10n.permGrantedCount(viewModel.requiredPermissionsGrantedCount, viewModel.requiredPermissionsCount))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(allGranted ? .green : .orange)
             }
@@ -73,6 +87,33 @@ struct PermissionsView: View {
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)).shadow(color: .black.opacity(0.06), radius: 16, y: 6))
+    }
+
+    private var fullDiskTargetHint: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "folder.badge.questionmark").foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.permFDATargetTitle).font(.system(size: 12, weight: .semibold))
+                    Text(L10n.permFDATargetHint(PermissionsService.fullDiskAccessTargetPath))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    Text(L10n.permRestartAfterFDA).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            HStack(spacing: 12) {
+                Button(L10n.permCopyAppPath) { PermissionsService.copyFullDiskAccessTargetToPasteboard() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                Button(L10n.permCheckAgain) { viewModel.refreshPermissions() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.orange.opacity(0.08)))
     }
 
     private var terminalHint: some View {
@@ -121,6 +162,10 @@ struct PermissionsView: View {
 
                 HStack(spacing: 16) {
                     Button(L10n.back) { viewModel.appPhase = .welcome }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    Button(L10n.permCheckAgain) { viewModel.refreshPermissions() }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                     Button { viewModel.startInitialScan() } label: {
                         HStack(spacing: 6) {
                             Text(L10n.scanAnyway)
@@ -139,14 +184,15 @@ struct PermissionsView: View {
 
 private struct PermissionRow: View {
     let permission: PermissionItem
+    var displaysAsGranted: Bool
 
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(permission.isGranted ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
+                    .fill(displaysAsGranted ? Color.green.opacity(0.12) : Color.orange.opacity(0.12))
                     .frame(width: 36, height: 36)
-                Image(systemName: permission.icon).font(.system(size: 15)).foregroundStyle(permission.isGranted ? .green : .orange)
+                Image(systemName: permission.icon).font(.system(size: 15)).foregroundStyle(displaysAsGranted ? .green : .orange)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -156,12 +202,12 @@ private struct PermissionRow: View {
 
             Spacer()
 
-            Image(systemName: permission.isGranted ? "checkmark.circle.fill" : "circle")
+            Image(systemName: displaysAsGranted ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 20))
-                .foregroundStyle(permission.isGranted ? .green : .secondary.opacity(0.4))
+                .foregroundStyle(displaysAsGranted ? .green : .secondary.opacity(0.4))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(permission.isGranted ? 0.03 : 0.06)))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(displaysAsGranted ? 0.03 : 0.06)))
     }
 }

@@ -55,6 +55,24 @@ struct FileDetailPanelView: View {
                     mono: true
                 )
             }
+            if item.isDirectory, let metrics = viewModel.lastScanMetrics, metrics.hasVisibleValues {
+                Divider().opacity(0.35)
+                detailRow(
+                    label: L10n.scanMetricCloneMerged,
+                    value: ByteFormatter.string(from: metrics.cloneBytesMerged),
+                    mono: true
+                )
+                detailRow(
+                    label: L10n.scanMetricCloneGroups,
+                    value: "\(metrics.cloneGroupsMerged)",
+                    mono: true
+                )
+                detailRow(
+                    label: L10n.scanMetricHardlinkSkipped,
+                    value: "\(metrics.hardlinkFilesSkipped)",
+                    mono: true
+                )
+            }
         }
     }
 

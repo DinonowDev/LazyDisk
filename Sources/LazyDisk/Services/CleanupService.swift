@@ -1,23 +1,41 @@
 import Foundation
 import LazyDiskCore
 
+struct CleanupDeleteResult {
+    let succeeded: [URL]
+    let failed: [(URL, Error)]
+    let trashedItemURLs: [URL]
+
+    var hadFailures: Bool { !failed.isEmpty }
+}
+
 enum CleanupService {
-    static func deleteItems(urls: [URL]) throws {
-        var lastError: Error?
-        var anySucceeded = false
+    /// Prefer Trash (recoverable) like DaisyDisk; does not fall back to permanent delete when Trash refuses.
+    static func deleteItems(urls: [URL], useTrash: Bool = true) throws -> CleanupDeleteResult {
+        var succeeded: [URL] = []
+        var failed: [(URL, Error)] = []
+        var trashed: [URL] = []
 
         for url in urls {
             do {
-                try deleteItem(at: url)
-                anySucceeded = true
+                let trashedURL = try deleteItem(at: url, useTrash: useTrash)
+                succeeded.append(url)
+                if let trashedURL {
+                    trashed.append(trashedURL)
+                }
             } catch {
-                lastError = error
+                failed.append((url, error))
             }
         }
 
-        if !anySucceeded, let lastError {
-            throw lastError
+        let result = CleanupDeleteResult(succeeded: succeeded, failed: failed, trashedItemURLs: trashed)
+        if succeeded.isEmpty, let first = failed.first?.1 {
+            throw first
         }
+        if result.hadFailures {
+            throw CleanupError.partialFailure(result)
+        }
+        return result
     }
 
     static func canDelete(url: URL) -> Bool {
@@ -35,59 +53,53 @@ enum CleanupService {
             "/Applications"
         ]
 
-        let path = url.standardizedFileURL.path
-        return !protectedPaths.contains(path)
+        let path = PathUtils.resolved(url).path
+        if protectedPaths.contains(path) { return false }
+        return !protectedPaths.contains { protected in
+            path.hasPrefix(protected + "/") && protected != "/"
+        }
     }
 
     // MARK: - Private
 
-    private static func deleteItem(at url: URL) throws {
-        do {
-            try FileManager.default.removeItem(at: url)
-        } catch {
-            guard directoryExists(at: url) else { throw error }
-            try deleteDirectoryContents(at: url)
-        }
-    }
-
-    private static func deleteDirectoryContents(at url: URL) throws {
-        let children = try FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
-
-        var deletedCount = 0
-        var childErrors: [Error] = []
-
-        for child in children {
-            do {
-                try deleteItem(at: child)
-                deletedCount += 1
-            } catch {
-                childErrors.append(error)
+    @discardableResult
+    private static func deleteItem(at url: URL, useTrash: Bool) throws -> URL? {
+        let target = PackageDeleteSupport.deletionTarget(for: url)
+        if useTrash {
+            if let trashed = tryMoveToTrash(target) {
+                return trashed
             }
+            throw CleanupError.trashRefused(target)
         }
-
-        guard deletedCount > 0 else {
-            throw childErrors.first ?? CleanupError.nothingDeletable(url)
-        }
+        try FileManager.default.removeItem(at: target)
+        return nil
     }
 
-    private static func directoryExists(at url: URL) -> Bool {
-        var isDirectory = ObjCBool(false)
-        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
-            && isDirectory.boolValue
+    private static func tryMoveToTrash(_ url: URL) -> URL? {
+        var trashedURL: NSURL?
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
+            return trashedURL as URL?
+        } catch {
+            return nil
+        }
     }
 }
 
 enum CleanupError: LocalizedError {
     case nothingDeletable(URL)
+    case trashRefused(URL)
+    case partialFailure(CleanupDeleteResult)
 
     var errorDescription: String? {
         switch self {
         case .nothingDeletable(let url):
             return "“\(url.lastPathComponent)” couldn’t be deleted because you don’t have permission to access it."
+        case .trashRefused(let url):
+            return "“\(url.lastPathComponent)” couldn’t be moved to the Trash. Nothing was permanently deleted."
+        case .partialFailure(let result):
+            let names = result.failed.map { $0.0.lastPathComponent }.joined(separator: ", ")
+            return "Some items could not be deleted: \(names). \(result.succeeded.count) item(s) were removed."
         }
     }
 }

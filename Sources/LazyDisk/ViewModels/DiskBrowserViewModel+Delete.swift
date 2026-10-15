@@ -20,24 +20,37 @@ extension DiskBrowserViewModel {
             return
         }
         pendingDeleteURLs = deletable.map(\.url)
-        deleteWarnings = DeleteWarningService.analyze(urls: pendingDeleteURLs)
+        deleteWarnings = DeleteWarningService.analyze(
+            urls: pendingDeleteURLs,
+            volumePurgeableBytes: selectedVolume?.purgeableCapacity,
+            volumeTotalBytes: selectedVolume?.totalCapacity
+        )
         showDeleteConfirmation = true
     }
 
-    func confirmDelete() {
+    func confirmDelete(emptyTrashAfterward: Bool = false) {
         let urls = pendingDeleteURLs.filter { CleanupService.canDelete(url: $0) }
         guard !urls.isEmpty else { return }
 
         do {
-            try CleanupService.deleteItems(urls: urls)
+            let result = try CleanupService.deleteItems(urls: urls)
+            if emptyTrashAfterward || (urls.count > 1 && AppPreferences.load().emptyTrashAfterBulkDelete) {
+                try? TrashService.removeTrashedItems(at: result.trashedItemURLs)
+            }
+
+            let removed = Set(result.succeeded)
             selectedIDs.removeAll()
-            collectorItems.removeAll { item in urls.contains(item.url) }
+            collectorItems.removeAll { item in removed.contains(item.url) }
             pendingDeleteURLs.removeAll()
             deleteWarnings.removeAll()
 
             if let currentPath {
                 Task {
                     await cache.invalidate(currentPath)
+                    await DirectorySizeIndex.shared.invalidate(prefix: PathUtils.resolved(currentPath).path)
+                    if let volume = selectedVolume {
+                        await VolumeTreeScanCoordinator.shared.clear(volumeID: volume.id)
+                    }
                     navigate(to: currentPath)
                 }
             }
@@ -46,14 +59,31 @@ extension DiskBrowserViewModel {
         }
     }
 
+    var pendingDeleteTotalSize: Int64 {
+        let urls = pendingDeleteURLs
+        guard !urls.isEmpty else { return selectedSize }
+        return urls.reduce(0) { partial, url in
+            partial + sizeForDeleteCandidate(url)
+        }
+    }
+
     var deleteConfirmationMessage: String {
-        let count = pendingDeleteURLs.count
-        let totalSize = pendingDeleteURLs.isEmpty ? selectedSize : collectorSize
-        return DeleteWarningService.summaryMessage(
+        DeleteWarningService.summaryMessage(
             for: deleteWarnings,
-            itemCount: count,
-            totalSize: totalSize
+            itemCount: pendingDeleteURLs.count,
+            totalSize: pendingDeleteTotalSize
         )
     }
 
+    private func sizeForDeleteCandidate(_ url: URL) -> Int64 {
+        if let item = entries.first(where: { $0.url == url })
+            ?? collectorItems.first(where: { $0.url == url }) {
+            return item.size
+        }
+        let values = try? url.resourceValues(forKeys: [
+            .totalFileAllocatedSizeKey,
+            .fileSizeKey
+        ])
+        return Int64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
+    }
 }

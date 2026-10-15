@@ -34,7 +34,9 @@ extension DiskBrowserViewModel {
             chartStyle = .rose
         }
         savePreferences()
-        refreshChartChildren()
+        if appPhase == .ready {
+            refreshChartChildrenIfNeeded()
+        }
     }
 
     func saveSidebarWidth(_ width: CGFloat) {

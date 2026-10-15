@@ -297,7 +297,12 @@ extension DiskBrowserViewModel {
     func exportCurrentFolderJSON() {
         guard let url = ExportService.savePanel(format: "json", defaultName: "lazydisk-export.json") else { return }
         do {
-            try ExportService.exportJSON(entries: browserListEntries, to: url)
+            try ExportService.exportJSON(
+                entries: browserListEntries,
+                to: url,
+                scanMetrics: lastScanMetrics,
+                folderPath: currentPath?.path
+            )
             exportMessage = L10n.exportDone
         } catch {
             errorMessage = error.localizedDescription
