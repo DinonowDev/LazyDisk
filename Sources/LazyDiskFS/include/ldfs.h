@@ -5,11 +5,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "ldfs_bulk.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef bool (*ldfs_cancel_fn)(void *ctx);
+
+typedef void (*ldfs_restricted_fn)(void *ctx, const char *path, int error_code);
 
 typedef struct {
     const char **prefixes;
@@ -18,15 +22,26 @@ typedef struct {
 } ldfs_child_entry;
 
 typedef struct {
+    int64_t clone_bytes_merged;
+    int32_t clone_groups_merged;
+    int64_t hardlink_files_skipped;
+} ldfs_scan_metrics;
+
+typedef struct {
     const char *root_path;
     const ldfs_child_entry *children;
     size_t child_count;
     bool skip_hidden;
+    bool firm_links;
+    bool use_physical_size;
     int worker_count;
     size_t buffer_size;
     bool turbo;
     ldfs_cancel_fn should_cancel;
     void *cancel_ctx;
+    ldfs_restricted_fn on_restricted_path;
+    void *restricted_ctx;
+    ldfs_scan_metrics *metrics_out;
 } ldfs_scan_options;
 
 typedef void (*ldfs_progress_fn)(
@@ -48,6 +63,8 @@ typedef struct {
     const char *root_path;
     size_t max_depth;
     bool skip_hidden;
+    bool firm_links;
+    bool use_physical_size;
     int worker_count;
     size_t buffer_size;
     bool turbo;
@@ -55,6 +72,9 @@ typedef struct {
     size_t child_count;
     ldfs_cancel_fn should_cancel;
     void *cancel_ctx;
+    ldfs_restricted_fn on_restricted_path;
+    void *restricted_ctx;
+    ldfs_scan_metrics *metrics_out;
 } ldfs_tree_options;
 
 typedef void (*ldfs_tree_progress_fn)(
