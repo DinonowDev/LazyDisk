@@ -1,5 +1,6 @@
 # Xcode
 .build/
+benchmark-results/
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/

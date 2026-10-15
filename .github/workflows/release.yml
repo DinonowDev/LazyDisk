@@ -21,8 +21,14 @@ jobs:
         run: |
           swift build --product LazyDisk
           swift test
+          swift test --filter APFSCloneIntegrationTests
 
-      - name: Build release bundle
+      - name: Build signed release bundle
+        env:
+          CODE_SIGN_IDENTITY: ${{ secrets.CODE_SIGN_IDENTITY }}
+          NOTARIZE_APP: ${{ secrets.NOTARYTOOL_PROFILE != '' && '1' || '' }}
+          NOTARYTOOL_PROFILE: ${{ secrets.NOTARYTOOL_PROFILE }}
+          VERIFY_BLESS: ${{ secrets.CODE_SIGN_IDENTITY != '' && '1' || '' }}
         run: ./Scripts/build-app.sh
 
       - name: Package zip

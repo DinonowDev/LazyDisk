@@ -23,7 +23,13 @@ jobs:
           swift build --product LazyDisk
           swift test
 
+      - name: APFS clone integration
+        run: swift test --filter APFSCloneIntegrationTests
+
       - name: Build release bundle
+        env:
+          CODE_SIGN_IDENTITY: ${{ secrets.CODE_SIGN_IDENTITY }}
+          VERIFY_BLESS: ${{ secrets.CODE_SIGN_IDENTITY != '' && '1' || '' }}
         run: ./Scripts/build-app.sh
 
       - name: Upload app artifact

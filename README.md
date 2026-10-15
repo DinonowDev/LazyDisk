@@ -35,6 +35,8 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 
 ### Scanning
 
+- **Native bulk scanner** — `getattrlistbulk` walk with APFS clone dedup, hard-link counting, mount/firmlink boundaries, and post-scan clone merge (DaisyDisk-class engine in `LazyDiskFS`)
+- **Admin Helper** — Optional SMJobBless privileged helper for protected paths (`Contents/Library/LaunchServices/com.lazydisk.app.AdminHelper`); install from Permissions or the in-app banner after a volume scan hits restricted folders
 - **Real-time scanning** — Async parallel directory walks with live size updates in the UI
 - **Persistent cache** — Reopen folders without a full rescan when nothing changed
 - **Filesystem monitor** — Detects changes and prompts for refresh when files are added or removed
@@ -81,24 +83,29 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 
 ## Quick start
 
+For **Full Disk Access** and **Admin Helper**, run the `.app` bundle (macOS ties privacy to the app path). Do not use `swift run` or `.build/debug/LazyDisk` for permission testing.
+
 ```bash
 git clone https://github.com/DinonowDev/LazyDisk.git
 cd LazyDisk
-swift build && .build/debug/LazyDisk
+./Scripts/dev.sh
 ```
+
+`dev.sh` builds, packages `dist/LazyDisk.app`, and opens it. In **System Settings → Privacy & Security → Full Disk Access**, enable **only** the path shown on the permissions screen (copy with **Copy path**). Quit LazyDisk (⌘Q) after changing access, then reopen.
 
 ## Build & run
 
 ```bash
-# Debug
-swift build && .build/debug/LazyDisk
+# Recommended — .app for permissions + helper
+./Scripts/dev.sh
 
-# Release binary
-swift build -c release && .build/release/LazyDisk
-
-# .app bundle
+# .app only
 ./Scripts/build-app.sh
 open dist/LazyDisk.app
+
+# CLI / development (no Full Disk Access UI guarantees)
+swift build && .build/debug/LazyDisk
+swift build -c release && .build/release/LazyDisk
 ```
 
 ## Tests
@@ -109,13 +116,17 @@ swift test
 
 Unit, integration, and filesystem E2E tests cover `LazyDiskCore` logic, CLI parsing, delete-path analysis, localization (6 languages), and headless CLI scans against temp directories.
 
+## Documentation
+
+- [Benchmark & performance testing (EN)](docs/benchmark-testing-en.md) · [راهنمای بنچمارک (FA)](docs/benchmark-testing-fa.md)
+
 CI runs `swift build`, `swift test`, and `Scripts/build-app.sh` on macOS via GitHub Actions.
 
 ## Download releases
 
 Pre-built `.app` bundles are available on **[GitHub Releases](https://github.com/DinonowDev/LazyDisk/releases)**.
 
-**Latest:** [v1.0.0](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-1.0.0-macos.zip` (macOS 13+, Apple Silicon & Intel)
+**Latest:** [v2.0.0](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-2.0.0-macos.zip` (macOS 13+, Apple Silicon & Intel)
 
 1. Download the latest release zip.
 2. Unzip and open `LazyDisk.app` (right-click → **Open** if Gatekeeper blocks unsigned builds).

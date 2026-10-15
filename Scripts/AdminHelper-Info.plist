@@ -9,9 +9,9 @@
     <key>CFBundleName</key>
     <string>LazyDisk Admin Helper</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>2.0.0</string>
     <key>SMAuthorizedClients</key>
     <array>
         <string>identifier "com.lazydisk.app"</string>
