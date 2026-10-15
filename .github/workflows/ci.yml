@@ -20,8 +20,13 @@ jobs:
 
       - name: Test
         run: |
+          set -euo pipefail
           swift build --product LazyDisk
-          swift test
+          classes=$(swift test --list-tests 2>/dev/null | sed 's|/[^/]*$||' | sed 's|.*\.||' | sort -u)
+          for class in $classes; do
+            echo "=== swift test --filter ${class} ==="
+            swift test --filter "$class"
+          done
 
       - name: APFS clone integration
         run: swift test --filter APFSCloneIntegrationTests
