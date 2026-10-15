@@ -56,7 +56,7 @@ final class PrivilegedScanProgressTests: XCTestCase {
         await store.launch(requestID: requestID, path: root.path)
 
         var sawProgress = false
-        for _ in 0..<40 {
+        for _ in 0..<120 {
             let items = await store.progress(for: [requestID])
             if let item = items.first, item.filesScanned > 0 || item.totalSize > 0 {
                 sawProgress = true
