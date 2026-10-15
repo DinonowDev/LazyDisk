@@ -5,6 +5,7 @@ public actor DirectorySizeIndex {
     public static let shared = DirectorySizeIndex()
 
     private var sizesByPath: [String: Int64] = [:]
+    private var metricsByPath: [String: NativeScanMetrics] = [:]
     private var inflightWalks: [String: Task<DirectorySizeWalker.WalkResult, Never>] = [:]
     private var partialObservers: [String: [@Sendable (DirectorySizeWalker.WalkResult) -> Void]] = [:]
 
@@ -14,6 +15,10 @@ public actor DirectorySizeIndex {
 
     public func sizesSnapshot() -> [String: Int64] {
         sizesByPath
+    }
+
+    public func scanMetrics(for path: String) -> NativeScanMetrics? {
+        metricsByPath[path]
     }
 
     public func importSizes(_ sizes: [String: Int64]) {
@@ -96,6 +101,9 @@ public actor DirectorySizeIndex {
 
     public func store(_ result: DirectorySizeWalker.WalkResult, forRoot rootPath: String) {
         sizesByPath[rootPath] = result.totalSize
+        if let metrics = result.scanMetrics {
+            metricsByPath[rootPath] = metrics
+        }
         for (childPath, size) in result.childSizesByPath {
             sizesByPath[childPath] = size
         }

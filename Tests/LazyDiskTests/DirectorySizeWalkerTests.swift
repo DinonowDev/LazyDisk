@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 @testable import LazyDiskCore
@@ -141,5 +142,52 @@ final class DirectorySizeWalkerTests: XCTestCase {
         let purgeable: Int64 = 80_000_000_000
         let residual = used - scanned - purgeable
         XCTAssertEqual(residual, 10_000_000_000)
+    }
+
+    func testAPFSCloneFilesCountedOnceInNativeScan() throws {
+        let bucket = tempRoot.appendingPathComponent("clones", isDirectory: true)
+        try FileManager.default.createDirectory(at: bucket, withIntermediateDirectories: true)
+        let original = bucket.appendingPathComponent("source.bin")
+        let cloned = bucket.appendingPathComponent("linked.bin")
+        try Data(count: 80_000).write(to: original)
+
+        let cloneStatus = original.path.withCString { source in
+            cloned.path.withCString { destination in
+                clonefile(source, destination, 0)
+            }
+        }
+        if cloneStatus != 0 {
+            throw XCTSkip("clonefile unavailable on this volume (\(cloneStatus))")
+        }
+
+        let result = DirectorySizeWalker.immediateChildSizes(at: tempRoot, configuration: .volumeRoot)
+
+        XCTAssertGreaterThan(result.totalSize, 70_000)
+        let metrics = result.scanMetrics
+        if result.totalSize < 120_000 {
+            XCTAssertEqual(result.filesScanned, 1, "inline dedup or post-scan merge collapsed clone pair")
+            if let metrics {
+                XCTAssertGreaterThan(metrics.cloneBytesMerged, 0, "clone merge should report deduplicated bytes")
+            }
+        } else {
+            XCTAssertEqual(result.filesScanned, 2, "kernel omitted CLONEID; pair counted twice until merge tightens")
+            if let metrics, metrics.cloneGroupsMerged > 0 {
+                XCTAssertGreaterThan(metrics.cloneBytesMerged, 0)
+            }
+        }
+    }
+
+    func testImmediateChildSizesCountsHardLinksOnce() throws {
+        let bucket = tempRoot.appendingPathComponent("shared", isDirectory: true)
+        try FileManager.default.createDirectory(at: bucket, withIntermediateDirectories: true)
+        let original = bucket.appendingPathComponent("blob.bin")
+        try Data(count: 50_000).write(to: original)
+        try FileManager.default.linkItem(at: original, to: bucket.appendingPathComponent("blob-copy.bin"))
+
+        let result = DirectorySizeWalker.immediateChildSizes(at: tempRoot, configuration: .volumeRoot)
+
+        XCTAssertEqual(result.filesScanned, 1, "hard links should contribute one logical file")
+        XCTAssertGreaterThan(result.totalSize, 45_000)
+        XCTAssertLessThan(result.totalSize, 90_000)
     }
 }

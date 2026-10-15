@@ -6,11 +6,21 @@ public enum DirectorySizeWalker {
         public let childSizesByPath: [String: Int64]
         public let totalSize: Int64
         public let filesScanned: Int
+        public let scanMetrics: NativeScanMetrics?
+        public let restrictedScanEvents: [RestrictedScanEvent]
 
-        public init(childSizesByPath: [String: Int64], totalSize: Int64, filesScanned: Int = 0) {
+        public init(
+            childSizesByPath: [String: Int64],
+            totalSize: Int64,
+            filesScanned: Int = 0,
+            scanMetrics: NativeScanMetrics? = nil,
+            restrictedScanEvents: [RestrictedScanEvent] = []
+        ) {
             self.childSizesByPath = childSizesByPath
             self.totalSize = totalSize
             self.filesScanned = filesScanned
+            self.scanMetrics = scanMetrics
+            self.restrictedScanEvents = restrictedScanEvents
         }
     }
 
@@ -18,23 +28,44 @@ public enum DirectorySizeWalker {
         public var skipHiddenFiles: Bool
         public var partialUpdateInterval: Int
         public var parallelism: Int?
+        /// Count on-disk bytes (DATAALLOCSIZE / RALLOCSIZE), matching DaisyDisk physical sizing.
+        public var usePhysicalSize: Bool
+        /// Overrides getattrlistbulk buffer for A/B tuning (nil = use `NativeScanTuningStore` / defaults).
+        public var nativeBufferSize: Int?
 
-        public static let `default` = Configuration(skipHiddenFiles: true, partialUpdateInterval: 96, parallelism: nil)
-        public static let volumeRoot = Configuration(skipHiddenFiles: false, partialUpdateInterval: 96, parallelism: nil)
-        public static let chartPreview = Configuration(skipHiddenFiles: true, partialUpdateInterval: 40, parallelism: nil)
-        public static let fastSizing = Configuration(skipHiddenFiles: true, partialUpdateInterval: 512, parallelism: nil)
+        public static let `default` = Configuration(
+            skipHiddenFiles: true, partialUpdateInterval: 96, parallelism: nil, usePhysicalSize: true
+        )
+        public static let volumeRoot = Configuration(
+            skipHiddenFiles: false, partialUpdateInterval: 96, parallelism: nil, usePhysicalSize: true
+        )
+        public static let chartPreview = Configuration(
+            skipHiddenFiles: true, partialUpdateInterval: 40, parallelism: nil, usePhysicalSize: true
+        )
+        public static let fastSizing = Configuration(
+            skipHiddenFiles: true, partialUpdateInterval: 512, parallelism: nil, usePhysicalSize: true
+        )
 
-        public init(skipHiddenFiles: Bool, partialUpdateInterval: Int, parallelism: Int? = nil) {
+        public init(
+            skipHiddenFiles: Bool,
+            partialUpdateInterval: Int,
+            parallelism: Int? = nil,
+            usePhysicalSize: Bool = true,
+            nativeBufferSize: Int? = nil
+        ) {
             self.skipHiddenFiles = skipHiddenFiles
             self.partialUpdateInterval = max(32, partialUpdateInterval)
             self.parallelism = parallelism
+            self.usePhysicalSize = usePhysicalSize
+            self.nativeBufferSize = nativeBufferSize
         }
     }
 
     private static let sizeKeys: [URLResourceKey] = [
         .totalFileAllocatedSizeKey,
         .fileSizeKey,
-        .isRegularFileKey
+        .isRegularFileKey,
+        .fileResourceIdentifierKey
     ]
 
     public static func immediateChildSizes(
@@ -57,11 +88,13 @@ public enum DirectorySizeWalker {
                 listedChildren: childURLs,
                 matcher: matcher,
                 skipHiddenFiles: configuration.skipHiddenFiles,
+                usePhysicalSize: configuration.usePhysicalSize,
                 parallelism: configuration.parallelism,
+                nativeBufferSize: configuration.nativeBufferSize,
                 shouldCancel: shouldCancel,
                 onPartial: onPartial
             ) {
-                if native.totalSize > 0 || native.filesScanned > 0 || childURLs.isEmpty {
+                if native.totalSize > 0 || native.filesScanned > 0 {
                     return native
                 }
             }
@@ -70,6 +103,7 @@ public enum DirectorySizeWalker {
         var childSizes: [String: Int64] = [:]
         var total: Int64 = 0
         var filesScanned = 0
+        var seenResourceIDs = Set<Data>()
 
         var options: FileManager.DirectoryEnumerationOptions = []
         if configuration.skipHiddenFiles {
@@ -102,6 +136,10 @@ public enum DirectorySizeWalker {
             autoreleasepool {
                 guard let values = try? fileURL.resourceValues(forKeys: Set(sizeKeys)) else { return }
                 guard values.isRegularFile == true else { return }
+
+                if let resourceID = values.fileResourceIdentifier as? Data {
+                    guard seenResourceIDs.insert(resourceID).inserted else { return }
+                }
 
                 let allocated = Int64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
                 guard allocated > 0 else { return }

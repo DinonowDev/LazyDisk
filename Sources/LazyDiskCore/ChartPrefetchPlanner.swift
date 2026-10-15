@@ -15,7 +15,7 @@ public enum ChartPrefetchPlanner {
         chartMap: [String: [DiskItem]],
         chartParents: [DiskItem],
         siblings: [DiskItem],
-        maxCount: Int = 48
+        maxCount: Int = 96
     ) -> [DiskItem] {
         var seen = Set<String>()
         var candidates: [Candidate] = []

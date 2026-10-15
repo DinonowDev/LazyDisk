@@ -25,23 +25,23 @@ final class DeletePathAnalyzerTests: XCTestCase {
     }
 
     func testDetectsLibraryContainerPaths() {
+        let homeLibrary = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library", isDirectory: true)
         XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
-            URL(fileURLWithPath: "/Users/me/Library/Caches")
+            homeLibrary.appendingPathComponent("Caches", isDirectory: true)
         ))
         XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
-            URL(fileURLWithPath: "/Users/me/Library/Logs")
+            homeLibrary.appendingPathComponent("Logs", isDirectory: true)
         ))
-        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
-            URL(fileURLWithPath: "/Users/me/Library")
-        ))
-        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
+        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(homeLibrary))
+        XCTAssertFalse(DeletePathAnalyzer.isLibraryContainerPath(
             URL(fileURLWithPath: "/Library/Caches")
         ))
         XCTAssertFalse(DeletePathAnalyzer.isLibraryContainerPath(
-            URL(fileURLWithPath: "/Users/me/Library/Caches/Homebrew")
+            homeLibrary.appendingPathComponent("Caches/Homebrew", isDirectory: true)
         ))
-        XCTAssertFalse(DeletePathAnalyzer.isLibraryContainerPath(
-            URL(fileURLWithPath: "/Users/me/Library/Application Support")
+        XCTAssertTrue(DeletePathAnalyzer.isLibraryContainerPath(
+            homeLibrary.appendingPathComponent("Application Support", isDirectory: true)
         ))
     }
 }

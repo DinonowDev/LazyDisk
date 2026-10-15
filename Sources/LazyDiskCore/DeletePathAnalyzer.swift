@@ -7,6 +7,8 @@ public enum DeletePathAnalyzer {
         case systemPath
         case runningApplication
         case sensitiveLibrary
+        case cloudPlaceholder
+        case purgeableVolume
     }
 
     public static func warningKinds(for url: URL) -> [WarningKind] {
@@ -15,6 +17,7 @@ public enum DeletePathAnalyzer {
         if isTimeMachineRelated(url) { kinds.append(.timeMachine) }
         if isCriticalSystemPath(url) { kinds.append(.systemPath) }
         if isSensitiveLibraryPath(url) { kinds.append(.sensitiveLibrary) }
+        if isCloudPlaceholder(url) { kinds.append(.cloudPlaceholder) }
         return kinds
     }
 
@@ -51,11 +54,34 @@ public enum DeletePathAnalyzer {
 
     /// Standard macOS Library folders that must not be moved to Trash as a whole.
     /// Delete individual items inside them (e.g. `~/Library/Caches/Homebrew`) instead.
+    public static func isCloudPlaceholder(_ url: URL) -> Bool {
+        let keys: Set<URLResourceKey> = [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey]
+        guard let values = try? url.resourceValues(forKeys: keys) else { return false }
+        guard values.isUbiquitousItem == true else { return false }
+        return values.ubiquitousItemDownloadingStatus == .notDownloaded
+    }
+
+    /// Warn when the boot volume reports large purgeable space (deletes may not free disk immediately).
+    public static func shouldWarnPurgeableVolume(purgeableBytes: Int64, totalBytes: Int64) -> Bool {
+        guard totalBytes > 0, purgeableBytes > 500_000_000 else { return false }
+        return Double(purgeableBytes) / Double(totalBytes) > 0.08
+    }
+
     public static func isLibraryContainerPath(_ url: URL) -> Bool {
-        let path = url.standardizedFileURL.path
-        if path.hasSuffix("/Library") { return true }
-        guard let range = path.range(of: "/Library/", options: .backwards) else { return false }
-        let tail = String(path[range.upperBound...])
-        return tail == "Caches" || tail == "Logs"
+        let path = PathUtils.resolved(url).path
+        let homeLibrary = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library", isDirectory: true)
+            .standardizedFileURL.path
+        if path == homeLibrary { return true }
+        guard path.hasPrefix(homeLibrary + "/") else { return false }
+        let tail = String(path.dropFirst(homeLibrary.count + 1))
+        let blockedRoots = [
+            "Caches",
+            "Logs",
+            "Application Support",
+            "Containers",
+            "Preferences"
+        ]
+        return blockedRoots.contains { tail == $0 }
     }
 }

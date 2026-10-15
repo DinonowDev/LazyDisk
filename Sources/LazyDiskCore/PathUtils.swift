@@ -11,6 +11,46 @@ public enum PathUtils {
         return current == root || current.hasPrefix(root + "/")
     }
 
+    /// Paths to try when matching native scan stats to a listed directory (firmlink vs data volume).
+    public static func directorySizeLookupCandidates(itemURL: URL, scanRoot: URL) -> [String] {
+        var seen = Set<String>()
+        var candidates: [String] = []
+
+        func append(_ path: String) {
+            guard !path.isEmpty, seen.insert(path).inserted else { return }
+            candidates.append(path)
+        }
+
+        append(resolved(itemURL).path)
+        append(itemURL.standardizedFileURL.path)
+
+        var root = resolved(scanRoot).path
+        if root.count > 1, root.hasSuffix("/") {
+            root.removeLast()
+        }
+        let name = itemURL.lastPathComponent
+        if !name.isEmpty, name != ".", name != ".." {
+            append((root as NSString).appendingPathComponent(name))
+            if name != root {
+                append("/" + name)
+            }
+        }
+        return candidates
+    }
+
+    public static func directorySize(
+        in statsByPath: [String: Int64],
+        itemURL: URL,
+        scanRoot: URL
+    ) -> Int64? {
+        for path in directorySizeLookupCandidates(itemURL: itemURL, scanRoot: scanRoot) {
+            if let size = statsByPath[path], size > 0 {
+                return size
+            }
+        }
+        return nil
+    }
+
     public static func relativeComponents(from path: URL, scanRoot: URL) -> [String] {
         let current = resolved(path).path
         let root = resolved(scanRoot).path

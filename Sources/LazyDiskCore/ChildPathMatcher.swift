@@ -11,7 +11,8 @@ public struct ChildPathMatcher: Sendable {
     public let entries: [Entry]
 
     public init(root: URL, children: [URL]) {
-        rootPath = Self.normalizedDirectoryPath(PathUtils.resolved(root))
+        let normalizedRoot = Self.normalizedDirectoryPath(PathUtils.resolved(root))
+        rootPath = normalizedRoot
         entries = children.map { childURL in
             let canonical = PathUtils.resolved(childURL).path
             var prefixSet = Set<String>()
@@ -25,6 +26,8 @@ public struct ChildPathMatcher: Sendable {
             let name = childURL.lastPathComponent
             if !name.isEmpty, name != ".", name != ".." {
                 prefixSet.insert("/\(name)/")
+                // Native walks often report APFS data paths while listings use firmlink-resolved URLs.
+                prefixSet.insert(normalizedRoot + "/" + name + "/")
             }
 
             return Entry(canonical: canonical, prefixes: Array(prefixSet))

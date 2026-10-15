@@ -10,14 +10,18 @@ extension ChartTreeBuilder {
     ) -> BuildResult? {
         guard NativeDirectoryScanner.isAvailable else { return nil }
 
-        return NativeDirectoryScanner.buildChartTree(
+        guard let native = NativeDirectoryScanner.buildChartTree(
             at: root,
             listedEntries: listedEntries,
             maxDepth: options.maxDepth,
             skipHiddenFiles: options.skipHiddenFiles,
+            usePhysicalSize: true,
             parallelism: options.parallelism,
             shouldCancel: shouldCancel,
             onPartial: onPartial
-        )
+        ), native.totalSize > 0 || native.filesScanned > 0 else {
+            return nil
+        }
+        return native
     }
 }

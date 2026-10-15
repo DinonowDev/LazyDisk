@@ -35,17 +35,20 @@ public enum ChartTreeBuilder {
         public let totalSize: Int64
         public let filesScanned: Int
         public let deferredByParent: [String: [URL]]
+        public let scanMetrics: NativeScanMetrics?
 
         public init(
             statsByPath: [String: NodeStats],
             totalSize: Int64,
             filesScanned: Int,
-            deferredByParent: [String: [URL]] = [:]
+            deferredByParent: [String: [URL]] = [:],
+            scanMetrics: NativeScanMetrics? = nil
         ) {
             self.statsByPath = statsByPath
             self.totalSize = totalSize
             self.filesScanned = filesScanned
             self.deferredByParent = deferredByParent
+            self.scanMetrics = scanMetrics
         }
     }
 

@@ -59,17 +59,20 @@ public enum StringKey: String, CaseIterable {
     // Extended UI
     case welcomeTagline, selectVolume, totalCapacity, availableLabel, continueBtn, scanTakeTime
     case permAllSet, permRequired, permAllSetDesc, permRequiredDesc, permReadyScan, permGrantedCount
-    case permTerminalTitle, permTerminalHint, back, openSettings, scanAnyway, grantAllPerms
+    case permTerminalTitle, permTerminalHint, permFDATargetTitle, permFDATargetHint, permRestartAfterFDA
+    case permCopyAppPath, permCheckAgain
+    case back, openSettings, scanAnyway, grantAllPerms
     case prefScanning, prefDisplay, prefDefaultSort, done, ok, errorTitle
     case emptyFolder, diskLabel, folderLabel, volumeLabel, goUp, selectAll
     case menuNavigate, menuSortBy, menuFile
     case goalReached, goalNeedMore, dupWaste, dupCopiesCount, hiddenLabel, itemsSelected, hintSidebar
-    case permFullDiskTitle, permFullDiskDesc, permUserFilesTitle, permUserFilesDesc
+    case permFullDiskTitle, permFullDiskDesc, permAdminHelperTitle, permAdminHelperDesc
+    case permUserFilesTitle, permUserFilesDesc
     case permRemovableTitle, permRemovableDesc, permCleanupTitle, permCleanupDesc
     case dupPhaseCollect, dupPhaseHash, historyAdded, historyRemoved, historyChanged
     case menuBarTotal, menuBarPercent, errorDeleteFailed, errorCannotDelete, errorCannotDeleteLibraryContainer, suggestionsCount, scanProgressFmt
     case scanningDiskTitle, scanPreparing, scanReadingList, scanFoundItems
-    case scanFolderNamed, scanFoldersProgress, scanFinalizing, scanCaching, scanCachingFolders
+    case scanFolderNamed, scanFoldersProgress, scanFinalizing, scanCaching, scanCachingFolders, scanIndexingTree
     case scanIncrementalChecking, scanIncrementalUpToDate, scanIncrementalUpdating, scanIncrementalDone, scanIncrementalFolder
     case percentFmt, progressStepFmt
     case donateTitle, donateSubtitle, donateThankYou, donateCopy, donateCopied, donateAllNetworks, donateSupport, menuDonate
@@ -80,7 +83,11 @@ public enum StringKey: String, CaseIterable {
     case warnIOSBackupTitle, warnIOSBackupMsg, warnTimeMachineTitle, warnTimeMachineMsg
     case warnSystemTitle, warnSystemMsg, warnRunningAppTitle, warnRunningAppMsg
     case warnLibraryTitle, warnLibraryMsg, warnBulkDeleteTitle, warnBulkDeleteMsg
-    case deleteSummaryOne, deleteSummaryMany
+    case warnCloudPlaceholderTitle, warnCloudPlaceholderMsg
+    case warnPurgeableVolumeTitle, warnPurgeableVolumeMsg
+    case restrictedScanBannerTitle, restrictedScanBannerMessage, restrictedScanInstallHelper, restrictedScanRetry
+    case scanMetricCloneMerged, scanMetricHardlinkSkipped, scanMetricCloneGroups
+    case deleteSummaryOne, deleteSummaryMany, deleteEmptyTrashOption, adminHelperInstalled
     // Chart styles
     case chartStyleRose, chartStyleSunburst, chartStyleTreemap, chartUsedLabel, chartHintDrillDown, prefChartStyle
     // Smart collections
@@ -403,7 +410,12 @@ public struct LocalizationCatalog {
         .permReadyScan: ml(en: "All permissions granted — ready to scan", fa: "همه دسترسی‌ها داده شد — آماده اسکن", zh: "权限已授予 — 可以扫描", fr: "Autorisations accordées — prêt", ar: "الأذونات ممنوحة — جاهز", tr: "İzinler verildi — hazır"),
         .permGrantedCount: ml(en: "%d of %d granted", fa: "%d از %d داده شد", zh: "已授予 %d/%d", fr: "%d sur %d accordées", ar: "%d من %d ممنوحة", tr: "%d / %d verildi"),
         .permTerminalTitle: ml(en: "Running from Terminal?", fa: "از ترمینال اجرا می‌کنی؟", zh: "从终端运行？", fr: "Depuis le Terminal ?", ar: "تشغيل من الطرفية؟", tr: "Terminalden mi?"),
-        .permTerminalHint: ml(en: "Grant Full Disk Access to Terminal (or iTerm), not LazyDisk. For best results: open dist/LazyDisk.app", fa: "Full Disk Access را به Terminal بده. بهتر: dist/LazyDisk.app", zh: "将完全磁盘访问授予终端。", fr: "Accordez l'accès au Terminal.", ar: "امنح الوصول للطرفية.", tr: "Tam Disk Erişimini Terminal'e verin."),
+        .permTerminalHint: ml(en: "Grant Full Disk Access to Terminal (or iTerm), not LazyDisk. Build a .app: ./Scripts/dev.sh", fa: "Full Disk Access را به Terminal بده. برای اپ درست: ./Scripts/dev.sh", zh: "将完全磁盘访问授予终端。请运行 ./Scripts/dev.sh 构建 .app。", fr: "Accordez l'accès au Terminal. Lancez ./Scripts/dev.sh pour un .app.", ar: "امنح الوصول للطرفية. شغّل ./Scripts/dev.sh لبناء .app.", tr: "Tam Disk Erişimini Terminal'e verin. .app için: ./Scripts/dev.sh"),
+        .permFDATargetTitle: ml(en: "Enable Full Disk Access for this exact app", fa: "Full Disk Access را برای همین اپ فعال کن", zh: "请为此应用启用完全磁盘访问", fr: "Activez l'accès complet pour cette app", ar: "فعّل الوصول الكامل لهذا التطبيق", tr: "Tam disk erişimini bu uygulama için açın"),
+        .permFDATargetHint: ml(en: "In Privacy → Full Disk Access, turn on only this path (remove other LazyDisk copies if unsure):\n%@", fa: "در Privacy → Full Disk Access فقط این مسیر را فعال کن (نسخه‌های دیگر LazyDisk را حذف کن):\n%@", zh: "在隐私设置中仅启用此路径：\n%@", fr: "Dans Confidentialité, activez uniquement :\n%@", ar: "في الخصوصية، فعّل هذا المسار فقط:\n%@", tr: "Gizlilik'te yalnızca bu yolu açın:\n%@"),
+        .permRestartAfterFDA: ml(en: "After changing access, quit LazyDisk completely (⌘Q) and open it again.", fa: "بعد از تغییر دسترسی، LazyDisk را کامل ببند (⌘Q) و دوباره باز کن.", zh: "更改权限后请完全退出并重新打开 LazyDisk。", fr: "Après le changement, quittez LazyDisk (⌘Q) puis rouvrez-le.", ar: "بعد التغيير، أغلق LazyDisk (⌘Q) ثم افتحه مجددًا.", tr: "Değişiklikten sonra LazyDisk'i kapatın (⌘Q) ve yeniden açın."),
+        .permCopyAppPath: ml(en: "Copy path", fa: "کپی مسیر", zh: "复制路径", fr: "Copier le chemin", ar: "نسخ المسار", tr: "Yolu kopyala"),
+        .permCheckAgain: ml(en: "Check again", fa: "بررسی دوباره", zh: "重新检查", fr: "Revérifier", ar: "تحقق مجددًا", tr: "Yeniden kontrol"),
         .back: ml(en: "Back", fa: "برگشت", zh: "返回", fr: "Retour", ar: "رجوع", tr: "Geri"),
         .openSettings: ml(en: "Open Settings", fa: "باز کردن تنظیمات", zh: "打开设置", fr: "Ouvrir Réglages", ar: "فتح الإعدادات", tr: "Ayarları aç"),
         .scanAnyway: ml(en: "Scan Anyway", fa: "اسکن بدون دسترسی", zh: "仍然扫描", fr: "Analyser quand même", ar: "فحص على أي حال", tr: "Yine de tara"),
@@ -432,6 +444,8 @@ public struct LocalizationCatalog {
         .hintSidebar: ml(en: "Click open · ⌘ select · ⇧ range · drag → Collector · %@", fa: "کلیک باز · ⌘ انتخاب · ⇧ بازه · کشیدن → سطل · %@", zh: "点击打开 · ⌘选择 · ⇧范围 · 拖到收集器 · %@", fr: "Clic · ⌘ sélect · ⇧ plage · glisser → Collecteur · %@", ar: "نقر · ⌘ تحديد · ⇧ نطاق · سحب → المجمع · %@", tr: "Tıkla · ⌘ seç · ⇧ aralık · sürükle → Toplayıcı · %@"),
         .permFullDiskTitle: ml(en: "Full Disk Access", fa: "دسترسی کامل دیسک", zh: "完全磁盘访问", fr: "Accès complet au disque", ar: "وصول كامل للقرص", tr: "Tam Disk Erişimi"),
         .permFullDiskDesc: ml(en: "Scan system folders, caches, hidden files, and other users' data", fa: "اسکن فولدرهای سیستم، کش، فایل‌های مخفی", zh: "扫描系统文件夹、缓存和隐藏文件", fr: "Analyser dossiers système et caches", ar: "فحص مجلدات النظام والملفات المخفية", tr: "Sistem klasörleri ve önbellekler"),
+        .permAdminHelperTitle: ml(en: "Admin Helper", fa: "ابزار کمکی ادمین", zh: "管理员助手", fr: "Assistant administrateur", ar: "أداة المساعد الإدارية", tr: "Yönetici yardımcısı"),
+        .permAdminHelperDesc: ml(en: "Privileged scan of protected folders (installs with your password, like DaisyDisk)", fa: "اسکن پوشه‌های محافظت‌شده با نصب helper (مثل DaisyDisk)", zh: "以管理员权限扫描受保护文件夹（类似 DaisyDisk）", fr: "Analyse privilégiée des dossiers protégés (comme DaisyDisk)", ar: "فحص المجلدات المحمية بامتيازات (مثل DaisyDisk)", tr: "Korumalı klasörler için ayrıcalıklı tarama (DaisyDisk gibi)"),
         .permUserFilesTitle: ml(en: "Files & Folders", fa: "فایل‌ها و فولدرها", zh: "文件和文件夹", fr: "Fichiers et dossiers", ar: "الملفات والمجلدات", tr: "Dosyalar ve klasörler"),
         .permUserFilesDesc: ml(en: "Access Documents, Desktop, Downloads, and Library", fa: "دسترسی به Documents، Desktop، Downloads", zh: "访问文稿、桌面、下载", fr: "Accès Documents, Bureau, Téléchargements", ar: "الوصول للمستندات وسطح المكتب", tr: "Belgeler, Masaüstü, İndirilenler"),
         .permRemovableTitle: ml(en: "Removable Volumes", fa: "دیسک‌های خارجی", zh: "可移动卷", fr: "Volumes amovibles", ar: "أقراص قابلة للإزالة", tr: "Çıkarılabilir birimler"),
@@ -459,6 +473,7 @@ public struct LocalizationCatalog {
         .scanFinalizing: ml(en: "Finalizing results…", fa: "نهایی‌سازی نتایج…", zh: "完成结果…", fr: "Finalisation…", ar: "إنهاء النتائج…", tr: "Sonuçlar tamamlanıyor…"),
         .scanCaching: ml(en: "Caching subfolders…", fa: "کش کردن زیرفولدرها…", zh: "缓存子文件夹…", fr: "Mise en cache…", ar: "تخزين المجلدات…", tr: "Alt klasörler önbelleğe alınıyor…"),
         .scanCachingFolders: ml(en: "Caching %d of %d folders…", fa: "کش %d از %d فولدر…", zh: "缓存 %d / %d 文件夹…", fr: "Cache %d sur %d…", ar: "تخزين %d من %d…", tr: "%d / %d klasör önbelleğe alınıyor…"),
+        .scanIndexingTree: ml(en: "Indexing folder tree for navigation…", fa: "ایندکس درخت فولدرها برای ناوبری…", zh: "正在为导航建立文件夹索引…", fr: "Indexation de l’arborescence…", ar: "فهرسة شجرة المجلدات للتنقل…", tr: "Gezinme için klasör ağacı dizinleniyor…"),
         .scanIncrementalChecking: ml(en: "Checking for changes…", fa: "بررسی تغییرات…", zh: "检查变更…", fr: "Vérification des changements…", ar: "التحقق من التغييرات…", tr: "Değişiklikler kontrol ediliyor…"),
         .scanIncrementalUpToDate: ml(en: "Already up to date", fa: "به‌روز است", zh: "已是最新", fr: "Déjà à jour", ar: "محدّث بالفعل", tr: "Zaten güncel"),
         .scanIncrementalUpdating: ml(en: "Updating %d changed folders…", fa: "به‌روزرسانی %d فولدر تغییرکرده…", zh: "更新 %d 个变更文件夹…", fr: "Mise à jour de %d dossiers modifiés…", ar: "تحديث %d مجلدات متغيرة…", tr: "%d değişen klasör güncelleniyor…"),
@@ -496,8 +511,21 @@ public struct LocalizationCatalog {
         .warnLibraryMsg: ml(en: "These Library folders may contain mail, keychain data, or app settings.", fa: "این فولدرهای Library ممکن است شامل ایمیل، keychain یا تنظیمات برنامه باشند.", zh: "这些 Library 文件夹可能包含邮件、钥匙串或应用设置。", fr: "Ces dossiers Library peuvent contenir mail, trousseau ou réglages.", ar: "قد تحتوي على بريد أو keychain أو إعدادات.", tr: "Mail, anahtar zinciri veya uygulama ayarları içerebilir."),
         .warnBulkDeleteTitle: ml(en: "Bulk Delete", fa: "حذف گروهی", zh: "批量删除", fr: "Suppression groupée", ar: "حذف جماعي", tr: "Toplu silme"),
         .warnBulkDeleteMsg: ml(en: "You are about to delete %d items. Review carefully before confirming.", fa: "در حال حذف %d آیتم هستید. قبل از تأیید با دقت بررسی کنید.", zh: "即将删除 %d 个项目。请仔细确认。", fr: "Vous allez supprimer %d éléments. Vérifiez avant de confirmer.", ar: "أنت على وشك حذف %d عنصر. راجع بعناية.", tr: "%d öğe silinecek. Onaylamadan önce kontrol edin."),
+        .warnCloudPlaceholderTitle: ml(en: "iCloud Placeholder", fa: "فایل ابری (آفلاین)", zh: "iCloud 占位符", fr: "Fichier iCloud local", ar: "عنصر iCloud", tr: "iCloud yer tutucu"),
+        .warnCloudPlaceholderMsg: ml(en: "Some items are iCloud placeholders. Deleting removes the cloud copy; download first if you still need the files.", fa: "برخی آیتم‌ها نسخه ابری هستند. حذف نسخه iCloud را هم حذف می‌کند؛ در صورت نیاز ابتدا دانلود کنید.", zh: "部分项目是 iCloud 占位符。删除会移除云端副本；如需保留请先下载。", fr: "Certains éléments sont des fichiers iCloud. La suppression retire aussi la copie cloud ; téléchargez-les si besoin.", ar: "بعض العناصر عناصر iCloud. الحذف يزيل النسخة السحابية؛ نزّلها أولاً إن احتجتها.", tr: "Bazı öğeler iCloud yer tutucu. Silmek bulut kopyasını da kaldırır; gerekirse önce indirin."),
+        .warnPurgeableVolumeTitle: ml(en: "Purgeable Space", fa: "فضای قابل آزادسازی", zh: "可清除空间", fr: "Espace purgeable", ar: "مساحة قابلة للتفريغ", tr: "Temizlenebilir alan"),
+        .warnPurgeableVolumeMsg: ml(en: "This volume has a large purgeable cache. Freed space may not appear immediately in Finder until macOS purges caches.", fa: "حجم زیادی فضای قابل آزادسازی روی این دیسک است. فضای آزاد ممکن است بلافاصله در Finder دیده نشود.", zh: "此磁盘有大量可清除缓存。释放的空间可能不会立即在 Finder 中显示。", fr: "Ce volume a beaucoup d’espace purgeable. L’espace libéré peut ne pas apparaître tout de suite dans le Finder.", ar: "يحتوي هذا الحجم على مساحة قابلة للتفريغ كبيرة. قد لا يظهر المساحة المحررة فوراً في Finder.", tr: "Bu birimde çok temizlenebilir alan var. Boşalan yer hemen Finder’da görünmeyebilir."),
+        .restrictedScanBannerTitle: ml(en: "Protected folders were skipped", fa: "پوشه‌های محافظت‌شده رد شدند", zh: "已跳过受保护文件夹", fr: "Dossiers protégés ignorés", ar: "تم تخطي مجلدات محمية", tr: "Korumalı klasörler atlandı"),
+        .restrictedScanBannerMessage: ml(en: "%d locations need Admin Helper or Full Disk Access for a complete scan.", fa: "%d مسیر برای اسکن کامل به Admin Helper یا دسترسی کامل دیسک نیاز دارد.", zh: "%d 个位置需要管理员助手或完全磁盘访问权限才能完整扫描。", fr: "%d emplacements nécessitent l’assistant admin ou l’accès complet au disque.", ar: "%d مواقع تحتاج أداة المساعد أو الوصول الكامل للقرص.", tr: "%d konum için tam tarama için yönetici yardımcısı veya tam disk erişimi gerekir."),
+        .restrictedScanInstallHelper: ml(en: "Install Admin Helper", fa: "نصب Admin Helper", zh: "安装管理员助手", fr: "Installer l’assistant admin", ar: "تثبيت أداة المساعد", tr: "Yönetici yardımcısını kur"),
+        .restrictedScanRetry: ml(en: "Retry scan", fa: "اسکن مجدد", zh: "重新扫描", fr: "Relancer l’analyse", ar: "إعادة الفحص", tr: "Taramayı yenile"),
+        .scanMetricCloneMerged: ml(en: "Clone bytes deduplicated", fa: "بایت کلون ادغام‌شده", zh: "已去重克隆字节", fr: "Octets clones dédupliqués", ar: "بايتات مستنسخة مدمجة", tr: "Klon baytları birleştirildi"),
+        .scanMetricHardlinkSkipped: ml(en: "Hard links skipped", fa: "هاردلینک رد شده", zh: "已跳过硬链接", fr: "Liens physiques ignorés", ar: "روابط صلبة متخطاة", tr: "Sabit bağlar atlandı"),
+        .scanMetricCloneGroups: ml(en: "Clone groups merged", fa: "گروه کلون", zh: "克隆组合并", fr: "Groupes de clones fusionnés", ar: "مجموعات مستنسخة", tr: "Klon grupları"),
         .deleteSummaryOne: ml(en: "Delete 1 item (%@) permanently?", fa: "۱ آیتم (%@) برای همیشه حذف شود؟", zh: "永久删除 1 个项目 (%@)？", fr: "Supprimer définitivement 1 élément (%@) ?", ar: "حذف عنصر واحد (%@) نهائياً؟", tr: "1 öğe (%@) kalıcı olarak silinsin mi?"),
         .deleteSummaryMany: ml(en: "Delete %d items (%@) permanently?", fa: "%d آیتم (%@) برای همیشه حذف شوند؟", zh: "永久删除 %d 个项目 (%@)？", fr: "Supprimer définitivement %d éléments (%@) ?", ar: "حذف %d عنصر (%@) نهائياً؟", tr: "%d öğe (%@) kalıcı olarak silinsin mi?"),
+        .deleteEmptyTrashOption: ml(en: "Empty Trash after moving items", fa: "بعد از انتقال، سطل را خالی کن", zh: "移动后清空废纸篓", fr: "Vider la corbeille après déplacement", ar: "أفرغ السلة بعد النقل", tr: "Taşıdıktan sonra Çöp'ü boşalt"),
+        .adminHelperInstalled: ml(en: "Admin Helper installed. You can rescan protected folders.", fa: "Admin Helper نصب شد. می‌توانید پوشه‌های محافظت‌شده را دوباره اسکن کنید.", zh: "管理员助手已安装。可重新扫描受保护文件夹。", fr: "Assistant admin installé. Relancez l’analyse des dossiers protégés.", ar: "تم تثبيت أداة المساعد. أعد فحص المجلدات المحمية.", tr: "Yönetici yardımcısı kuruldu. Korumalı klasörleri yeniden tarayın."),
         .chartStyleRose: ml(en: "Rose", fa: "گل‌رز", zh: "玫瑰图", fr: "Rose", ar: "وردي", tr: "Gül"),
         .chartStyleSunburst: ml(en: "Sunburst", fa: "خورشیدی", zh: "旭日图", fr: "Sunburst", ar: "شمسي", tr: "Sunburst"),
         .chartStyleTreemap: ml(en: "Treemap", fa: "نقشه درختی", zh: "树状图", fr: "Treemap", ar: "خريطة شجرية", tr: "Treemap"),
