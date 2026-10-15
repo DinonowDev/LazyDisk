@@ -20,13 +20,12 @@ jobs:
       - name: Test
         run: |
           set -euo pipefail
-          swift build --product LazyDisk
-          classes=$(swift test --list-tests 2>/dev/null | sed 's|/[^/]*$||' | sed 's|.*\.||' | sort -u)
-          for class in $classes; do
-            echo "=== swift test --filter ${class} ==="
-            swift test --filter "$class"
+          mapfile -t test_classes < <(swift test --list-tests 2>/dev/null | sed 's|/[^/]*$||' | sed 's|.*\.||' | sort -u)
+          for class in "${test_classes[@]}"; do
+            echo "::group::swift test --filter ${class}"
+            swift test --filter "$class" || { echo "::error title=Test failed::${class}"; exit 1; }
+            echo "::endgroup::"
           done
-          swift test --filter APFSCloneIntegrationTests
 
       - name: Build signed release bundle
         env:
