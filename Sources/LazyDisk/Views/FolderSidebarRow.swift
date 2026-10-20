@@ -13,7 +13,7 @@ enum FileListColumns {
         let sizeWidth: CGFloat
         let showChevron: Bool
 
-        static let standard = Tier(spacing: 10, iconWidth: 32, sizeWidth: 72, showChevron: true)
+        static let standard = Tier(spacing: 10, iconWidth: 32, sizeWidth: 84, showChevron: true)
         static let compact = Tier(spacing: 8, iconWidth: 28, sizeWidth: 56, showChevron: false)
         static let minimal = Tier(spacing: 6, iconWidth: 24, sizeWidth: 48, showChevron: false)
 
@@ -62,7 +62,9 @@ struct FolderRowView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(color.opacity(isSelected || isHovered ? 0.22 : 0.12))
                     if item.isVirtual {
-                        Image(systemName: "ellipsis.circle.fill").font(.system(size: 14)).foregroundStyle(.secondary)
+                        Image(systemName: virtualIcon)
+                            .font(.system(size: 14))
+                            .foregroundStyle(virtualIconColor)
                     } else {
                         FileIconView(url: item.url, size: 22)
                     }
@@ -99,17 +101,26 @@ struct FolderRowView: View {
                 }
             },
             size: {
-                Text(item.isScanning ? "…" : item.formattedSize)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(item.isScanning ? .secondary : .primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(item.isScanning ? "…" : item.sidebarSizeText)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(item.isScanning ? .secondary : .primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    if item.showsReclaimableGap, !item.isScanning {
+                        Text(item.formattedReclaimableSize)
+                            .font(.system(size: 8, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.green)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
             },
             trailing: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.quaternary)
-                    .opacity(item.isDirectory && !item.isVirtual ? 1 : 0)
+                    .opacity(item.role == .snapshotGroup || (item.isDirectory && !item.isVirtual) ? 1 : 0)
             }
         )
         .padding(.horizontal, FileListColumns.rowPadding).padding(.vertical, 7)
@@ -122,7 +133,10 @@ struct FolderRowView: View {
                         .fill(FileAgeHeatmap.color(for: item.modifiedDate))
                 }
                 .overlay {
-                    if isSelected || isHovered || isKeyboardFocused {
+                    if item.isVirtual {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.secondary.opacity(0.55), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    } else if isSelected || isHovered || isKeyboardFocused {
                         RoundedRectangle(cornerRadius: 10).stroke(color.opacity(isSelected ? 0.35 : 0.18), lineWidth: 1)
                     }
                 }
@@ -131,6 +145,26 @@ struct FolderRowView: View {
                         .frame(width: 3).padding(.vertical, 8)
                         .opacity(isSelected || isHovered ? 1 : 0.5)
                 }
+        }
+    }
+
+    private var virtualIcon: String {
+        switch item.role {
+        case .snapshotGroup: return "clock.arrow.circlepath"
+        case .snapshot: return "camera.metering.spot"
+        case .purgeable: return "sparkles"
+        case .cloudSummary: return "icloud"
+        case .unscanned: return "lock.fill"
+        case .regular: return "ellipsis.circle.fill"
+        }
+    }
+
+    private var virtualIconColor: Color {
+        switch item.role {
+        case .snapshotGroup, .snapshot: return Color(red: 0.35, green: 0.55, blue: 0.72)
+        case .purgeable: return Color(red: 0.25, green: 0.65, blue: 0.40)
+        case .cloudSummary: return Color(red: 0.35, green: 0.55, blue: 0.85)
+        case .unscanned, .regular: return .secondary
         }
     }
 

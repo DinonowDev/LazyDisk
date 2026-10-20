@@ -57,7 +57,14 @@ extension FolderSidebarView {
 
     @ViewBuilder
     func itemContextMenu(_ item: DiskItem) -> some View {
-        if item.isDirectory && !item.isVirtual {
+        if item.role == .snapshotGroup {
+            Button(L10n.open) { viewModel.openItem(item) }
+        } else if item.role == .snapshot {
+            Button(L10n.detailShowDetails) { viewModel.selectItemForDetail(item) }
+            Button(L10n.snapshotDelete, role: .destructive) {
+                viewModel.requestSnapshotDelete(item)
+            }
+        } else if item.isDirectory && !item.isVirtual {
             Button(L10n.detailShowDetails) { viewModel.selectItemForDetail(item) }
             Divider()
             Button(L10n.open) { viewModel.openItem(item) }
@@ -65,14 +72,16 @@ extension FolderSidebarView {
             Button(L10n.detailShowDetails) { viewModel.selectItemForDetail(item) }
             Divider()
         }
-        Button(L10n.addToCollector) { viewModel.addToCollector(item) }
-        Button(L10n.revealFinder) { viewModel.revealInFinder(item) }
-        Button(L10n.quickLook) { QuickLookService.preview(urls: [item.url]) }
-        if !item.isVirtual && CleanupService.canDelete(url: item.url) {
-            Divider()
-            Button(L10n.deleteAction, role: .destructive) {
-                viewModel.selectedIDs = [item.id]
-                viewModel.requestDelete()
+        if !item.isVirtual {
+            Button(L10n.addToCollector) { viewModel.addToCollector(item) }
+            Button(L10n.revealFinder) { viewModel.revealInFinder(item) }
+            Button(L10n.quickLook) { QuickLookService.preview(urls: [item.url]) }
+            if CleanupService.canDelete(url: item.url) {
+                Divider()
+                Button(L10n.deleteAction, role: .destructive) {
+                    viewModel.selectedIDs = [item.id]
+                    viewModel.requestDelete()
+                }
             }
         }
     }

@@ -36,6 +36,13 @@ extension DiskBrowserViewModel {
 
     func navigate(to url: URL) {
         guard appPhase == .ready else { return }
+        if VirtualDiskPath.isVirtual(url) {
+            if VirtualDiskPath.isSnapshotGroup(url) {
+                openSnapshotBrowser()
+            }
+            return
+        }
+        closeSnapshotBrowser()
 
         pauseSidebarWidthTracking()
         clearSmartCollection()
@@ -203,6 +210,10 @@ extension DiskBrowserViewModel {
             closeDetailPanel()
             return
         }
+        if snapshotBrowser != nil {
+            closeSnapshotBrowser()
+            return
+        }
 
         guard let currentPath, let volume = selectedVolume else { return }
         let parent = PathUtils.resolved(currentPath).deletingLastPathComponent()
@@ -217,6 +228,10 @@ extension DiskBrowserViewModel {
     }
 
     func openItem(_ item: DiskItem) {
+        if item.role == .snapshotGroup {
+            openSnapshotBrowser()
+            return
+        }
         guard !item.isVirtual else { return }
 
         if item.isDirectory {
@@ -258,7 +273,11 @@ extension DiskBrowserViewModel {
     }
 
     func selectItemForDetail(_ item: DiskItem, at index: Int? = nil) {
-        guard !item.isVirtual else { return }
+        if item.role == .snapshotGroup {
+            openSnapshotBrowser()
+            return
+        }
+        guard item.role == .snapshot || !item.isVirtual else { return }
         pauseSidebarWidthTracking()
         selectedIDs = [item.id]
         detailItem = item

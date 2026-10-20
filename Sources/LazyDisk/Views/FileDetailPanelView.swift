@@ -38,7 +38,14 @@ struct FileDetailPanelView: View {
 
     private var statsSection: some View {
         VStack(spacing: 10) {
-            detailRow(label: L10n.columnSize, value: item.formattedSize, mono: true)
+            detailRow(label: L10n.detailApparent, value: item.sidebarSizeText, mono: true)
+            detailRow(label: L10n.detailFrees, value: item.formattedReclaimableSize, mono: true)
+            if let note = item.reclaimNote {
+                Text(note)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if item.isDirectory {
                 detailRow(
                     label: L10n.detailItemCount,
@@ -110,17 +117,28 @@ struct FileDetailPanelView: View {
                 )
             }
 
-            HStack(spacing: 8) {
-                detailActionButton(
-                    title: L10n.revealFinder,
-                    icon: "folder",
-                    action: { viewModel.revealInFinder(item) }
-                )
+            if !item.isVirtual {
+                HStack(spacing: 8) {
+                    detailActionButton(
+                        title: L10n.revealFinder,
+                        icon: "folder",
+                        action: { viewModel.revealInFinder(item) }
+                    )
 
+                    detailActionButton(
+                        title: L10n.quickLook,
+                        icon: "eye",
+                        action: { QuickLookService.preview(urls: [item.url]) }
+                    )
+                }
+            }
+
+            if item.role == .snapshot {
                 detailActionButton(
-                    title: L10n.quickLook,
-                    icon: "eye",
-                    action: { QuickLookService.preview(urls: [item.url]) }
+                    title: L10n.snapshotDelete,
+                    icon: "trash",
+                    prominent: true,
+                    action: { viewModel.requestSnapshotDelete(item) }
                 )
             }
 
@@ -182,6 +200,11 @@ struct FileDetailPanelView: View {
     }
 
     private func loadMetadata() {
+        if item.role == .snapshot || item.role == .snapshotGroup {
+            loadedPath = item.role == .snapshot ? item.url.lastPathComponent : L10n.localSnapshots
+            createdDate = item.modifiedDate
+            return
+        }
         loadedPath = item.url.path
         if let values = try? item.url.resourceValues(forKeys: [.creationDateKey, .canonicalPathKey]) {
             createdDate = values.creationDate

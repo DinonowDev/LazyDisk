@@ -14,8 +14,17 @@ struct FolderSidebarView: View {
         VStack(spacing: 0) {
             sidebarHeader
 
-            if viewModel.isDetailPanelVisible || !viewModel.isAtVolumeRoot {
+            if viewModel.isDetailPanelVisible || !viewModel.isAtVolumeRoot || viewModel.isShowingSnapshots {
                 breadcrumbSection
+            }
+
+            if viewModel.isShowingSnapshots, viewModel.snapshotBrowser?.sizeIsEstimate == true {
+                Text(L10n.snapshotSizeEstimate)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
             }
 
             if !isShowingDetail {

@@ -12,15 +12,23 @@ struct SimpleFolderSidebarView: View {
             header
             Divider().opacity(0.4)
 
-            if !viewModel.isAtVolumeRoot {
+            if !viewModel.isAtVolumeRoot || viewModel.isShowingSnapshots {
                 BreadcrumbView(
                     breadcrumbs: viewModel.breadcrumbs,
                     volumeName: viewModel.selectedVolume?.name ?? L10n.diskLabel
                 ) { url in
-                    viewModel.navigate(to: url)
+                    viewModel.navigateFromBreadcrumb(url)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
+            }
+
+            if viewModel.isShowingSnapshots, viewModel.snapshotBrowser?.sizeIsEstimate == true {
+                Text(L10n.snapshotSizeEstimate)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
             }
 
             folderList
@@ -104,12 +112,7 @@ struct SimpleFolderSidebarView: View {
     }
 
     private var headerTitle: String {
-        if viewModel.isAtVolumeRoot {
-            return viewModel.selectedVolume?.name ?? L10n.diskLabel
-        }
-        guard let path = viewModel.currentPath else { return L10n.diskLabel }
-        let name = path.lastPathComponent
-        return name.isEmpty ? path.path : name
+        viewModel.chartCenterTitle
     }
 
     private var folderList: some View {
@@ -131,9 +134,26 @@ struct SimpleFolderSidebarView: View {
                         viewModel.handleItemDoubleClick(item)
                     }
                     .onTapGesture {
+                        if item.role == .snapshotGroup {
+                            viewModel.openItem(item)
+                            return
+                        }
+                        if item.role == .snapshot {
+                            viewModel.requestSnapshotDelete(item)
+                            return
+                        }
                         guard !item.isVirtual else { return }
                         if item.isDirectory {
                             viewModel.openItem(item)
+                        }
+                    }
+                    .contextMenu {
+                        if item.role == .snapshot {
+                            Button(L10n.snapshotDelete, role: .destructive) {
+                                viewModel.requestSnapshotDelete(item)
+                            }
+                        } else if item.role == .snapshotGroup {
+                            Button(L10n.open) { viewModel.openItem(item) }
                         }
                     }
                     .onHover { hovering in
@@ -236,7 +256,7 @@ private struct SimpleFolderRow: View {
                 CompactProgressView(size: 10)
                     .fixedSize()
             } else {
-                Text(item.formattedSize)
+                Text(item.showsReclaimableGap ? item.formattedReclaimableSize : item.sidebarSizeText)
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .environment(\.layoutDirection, .leftToRight)

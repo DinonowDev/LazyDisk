@@ -11,12 +11,7 @@ struct SimpleContentView: View {
     }
 
     private var centerFolderName: String {
-        if viewModel.isAtVolumeRoot {
-            return viewModel.selectedVolume?.name ?? L10n.diskLabel
-        }
-        guard let path = viewModel.currentPath else { return L10n.diskLabel }
-        let name = path.lastPathComponent
-        return name.isEmpty ? path.path : name
+        viewModel.chartCenterTitle
     }
 
     private var showChartLoadingOverlay: Bool {
@@ -38,7 +33,7 @@ struct SimpleContentView: View {
             HSplitView {
                 chartPanel
                     .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
-                    .layoutPriority(0)
+                    .layoutPriority(1)
                     .clipped()
 
                 SimpleFolderSidebarView(
@@ -58,7 +53,7 @@ struct SimpleContentView: View {
                     ),
                     maxWidth: BrowserSidebarMetrics.simpleMaxWidth
                 )
-                .layoutPriority(1)
+                .layoutPriority(0)
                 .clipped()
                 .trackPanelWidth { viewModel.saveSidebarWidth($0) }
             }
@@ -100,14 +95,14 @@ struct SimpleContentView: View {
                         segments: viewModel.sunburstSegments,
                         totalSize: viewModel.displayTotalSize,
                         centerTitle: centerFolderName,
-                        centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                        centerSubtitle: viewModel.chartCenterSubtitle,
                         appearance: .daisyDisk,
                         layoutConfig: .daisyDisk,
                         hoveredID: effectiveChartHover,
                         onHover: setChartHover,
                         onSelect: chartItemSelected,
                         onCenterTap: {
-                            if !viewModel.isAtVolumeRoot {
+                            if viewModel.isShowingSnapshots || !viewModel.isAtVolumeRoot {
                                 viewModel.navigateUp()
                             }
                         },
@@ -128,7 +123,7 @@ struct SimpleContentView: View {
                     items: viewModel.chartItems,
                     totalSize: viewModel.displayTotalSize,
                     centerTitle: centerFolderName,
-                    centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                    centerSubtitle: viewModel.chartCenterSubtitle,
                     hoveredID: effectiveChartHover,
                     onHover: setChartHover,
                     onSelect: chartItemSelected,

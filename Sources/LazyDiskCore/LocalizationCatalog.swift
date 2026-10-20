@@ -108,6 +108,9 @@ public enum StringKey: String, CaseIterable {
     case modeSelectTitle, modeSimple, modeSimpleDesc, modeProfessional, modeProfessionalDesc, prefInterfaceMode
     case simpleChartScanning
     case simpleChartScanProgress, simpleChartScanRemaining, simpleChartScanCurrent, simpleChartScanRing, simpleChartScanFiles
+    case localSnapshots, snapshotDelete, snapshotDeleteTitle, snapshotDeleteMessage, snapshotDeleteNeedsHelper
+    case snapshotSizeEstimate, detailFrees, detailApparent
+    case reclaimCloudNote, reclaimCloneNote, reclaimLinkNote, reclaimEstimateNote, collectorApparent
 }
 
 public struct LocalizationCatalog {
@@ -577,6 +580,19 @@ public struct LocalizationCatalog {
         .simpleChartScanCurrent: ml(en: "Scanning: %@", fa: "در حال اسکن: %@", zh: "正在扫描：%@", fr: "Analyse : %@", ar: "جارٍ فحص: %@", tr: "Taranıyor: %@"),
         .simpleChartScanRing: ml(en: "Ring %d of %d", fa: "حلقه %d از %d", zh: "第 %d / %d 环", fr: "Anneau %d sur %d", ar: "الحلقة %d من %d", tr: "Halka %d / %d"),
         .simpleChartScanFiles: ml(en: "%d files indexed", fa: "%d فایل بررسی شد", zh: "已索引 %d 个文件", fr: "%d fichiers indexés", ar: "تم فهرسة %d ملف", tr: "%d dosya tarandı"),
+        .localSnapshots: ml(en: "Local Snapshots", fa: "اسنپ‌شات‌های محلی", zh: "本地快照", fr: "Instantanés locaux", ar: "لقطات محلية", tr: "Yerel anlık görüntüler"),
+        .snapshotDelete: ml(en: "Delete Snapshot", fa: "حذف اسنپ‌شات", zh: "删除快照", fr: "Supprimer l'instantané", ar: "حذف اللقطة", tr: "Anlık görüntüyü sil"),
+        .snapshotDeleteTitle: ml(en: "Delete this snapshot?", fa: "این اسنپ‌شات حذف شود؟", zh: "删除此快照？", fr: "Supprimer cet instantané ?", ar: "حذف هذه اللقطة؟", tr: "Bu anlık görüntü silinsin mi?"),
+        .snapshotDeleteMessage: ml(en: "Delete “%@”. Space held only by this snapshot is freed. This cannot be undone.", fa: "«%@» حذف می‌شود. فضایی که فقط این اسنپ‌شات نگه داشته آزاد می‌شود. این کار برگشت‌پذیر نیست.", zh: "删除“%@”。仅由此快照占用的空间会被释放。此操作无法撤销。", fr: "Supprimer « %@ ». L'espace retenu uniquement par cet instantané sera libéré. Action irréversible.", ar: "حذف «%@». يُحرَّر المساحة التي تحتفظ بها هذه اللقطة فقط. لا يمكن التراجع.", tr: "“%@” silinir. Yalnızca bu anlık görüntünün tuttuğu alan boşalır. Bu işlem geri alınamaz."),
+        .snapshotDeleteNeedsHelper: ml(en: "Deleting a snapshot needs the Admin Helper. Install it from Permissions, then try again.", fa: "حذف اسنپ‌شات به Admin Helper نیاز دارد. آن را از بخش دسترسی‌ها نصب کنید و دوباره تلاش کنید.", zh: "删除快照需要安装 Admin Helper。请在权限页安装后重试。", fr: "Supprimer un instantané exige l'Admin Helper. Installez-le dans Autorisations, puis réessayez.", ar: "حذف اللقطة يحتاج Admin Helper. ثبّته من الأذونات ثم أعد المحاولة.", tr: "Anlık görüntü silmek Admin Helper gerektirir. İzinler'den yükleyip yeniden deneyin."),
+        .snapshotSizeEstimate: ml(en: "macOS doesn't report each snapshot's size. These slices share the disk's purgeable space.", fa: "macOS حجم هر اسنپ‌شات را جدا گزارش نمی‌کند. این برش‌ها فضای قابل آزادسازی دیسک را بین خود تقسیم می‌کنند.", zh: "macOS 不报告每个快照的大小。这些分区共同代表磁盘的可清除空间。", fr: "macOS n'indique pas la taille de chaque instantané. Ces parts se partagent l'espace purgeable.", ar: "لا يبلّغ macOS عن حجم كل لقطة. هذه الشرائح تتقاسم المساحة القابلة للتفريغ.", tr: "macOS her anlık görüntünün boyutunu ayrı bildirmez. Bu dilimler diskin temizlenebilir alanını paylaşır."),
+        .detailFrees: ml(en: "Frees", fa: "آزاد می‌کند", zh: "可释放", fr: "Libère", ar: "يُحرر", tr: "Boşaltır"),
+        .detailApparent: ml(en: "Apparent", fa: "ظاهری", zh: "显示大小", fr: "Apparent", ar: "الظاهري", tr: "Görünen"),
+        .reclaimCloudNote: ml(en: "This file is not on disk. Deleting it frees nothing.", fa: "این فایل روی دیسک نیست. حذفش فضایی آزاد نمی‌کند.", zh: "此文件不在磁盘上。删除它不会释放空间。", fr: "Ce fichier n'est pas sur le disque. Le supprimer ne libère rien.", ar: "هذا الملف ليس على القرص. حذفه لا يحرر مساحة.", tr: "Bu dosya diskte değil. Silmek alan boşaltmaz."),
+        .reclaimCloneNote: ml(en: "This is an APFS clone. Other copies still share its data, so deleting this one frees nothing.", fa: "این یک کلون APFS است. نسخه‌های دیگر هنوز داده‌اش را شریک‌اند، پس حذف این یکی فضایی آزاد نمی‌کند.", zh: "这是 APFS 克隆。其他副本仍共享其数据，删除这一份不会释放空间。", fr: "C'est un clone APFS. D'autres copies partagent encore ses données : le supprimer ne libère rien.", ar: "هذه نسخة APFS. النسخ الأخرى ما زالت تشارك بياناتها، لذا حذفها لا يحرر مساحة.", tr: "Bu bir APFS klonu. Diğer kopyalar veriyi paylaştığı için bunu silmek alan boşaltmaz."),
+        .reclaimLinkNote: ml(en: "This is a hard link. Deleting this name keeps the data while another link remains.", fa: "این یک هاردلینک است. تا وقتی نام دیگری مانده، حذف این نام داده را نگه می‌دارد.", zh: "这是硬链接。只要还有其他链接，删除这个名称不会删除数据。", fr: "C'est un lien physique. Le supprimer conserve les données tant qu'un autre lien existe.", ar: "هذا رابط صلب. حذفه يُبقي البيانات ما دام هناك رابط آخر.", tr: "Bu bir sabit bağlantı. Başka bir bağlantı dururken bu adı silmek veriyi tutar."),
+        .reclaimEstimateNote: ml(en: "Estimated share of purgeable space, not a measured snapshot size.", fa: "سهم تخمینی از فضای قابل آزادسازی است، نه حجم اندازه‌گیری‌شدهٔ اسنپ‌شات.", zh: "这是可清除空间的估计份额，不是测得的快照大小。", fr: "Part estimée de l'espace purgeable, pas une taille mesurée.", ar: "حصة تقديرية من المساحة القابلة للتفريغ، وليست حجمًا مقيسًا للقطة.", tr: "Temizlenebilir alanın tahmini payı; ölçülmüş anlık görüntü boyutu değil."),
+        .collectorApparent: ml(en: "Apparent", fa: "ظاهری", zh: "显示", fr: "Apparent", ar: "الظاهري", tr: "Görünen"),
     ]
 
     private static func ml(en: String, fa: String, zh: String, fr: String, ar: String, tr: String) -> [AppLanguage: String] {

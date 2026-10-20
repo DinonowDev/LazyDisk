@@ -146,6 +146,29 @@ public final class PrivilegedScanClient: @unchecked Sendable {
         }
     }
 
+    public func deleteLocalSnapshot(name: String, volumePath: String) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            guard let (connection, proxy) = makeConnection(
+                onInterrupt: { continuation.resume(throwing: PrivilegedScanClientError.connectionInterrupted) }
+            ) else {
+                continuation.resume(throwing: PrivilegedScanClientError.unavailable)
+                return
+            }
+            proxy.deleteLocalSnapshot(named: name, atPath: volumePath) { accepted, error in
+                connection.invalidate()
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard accepted != nil else {
+                    continuation.resume(throwing: PrivilegedScanClientError.emptyResult)
+                    return
+                }
+                continuation.resume()
+            }
+        }
+    }
+
     public func cloneCount(atPath path: String) async throws -> Int64 {
         try await withCheckedThrowingContinuation { continuation in
             guard let (connection, proxy) = makeConnection(
@@ -223,7 +246,7 @@ private final class ReachabilityGate: @unchecked Sendable {
     }
 }
 
-public enum PrivilegedScanClientError: LocalizedError {
+public enum PrivilegedScanClientError: LocalizedError, Equatable {
     case unavailable
     case emptyResult
     case connectionInvalidated

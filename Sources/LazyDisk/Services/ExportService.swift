@@ -4,16 +4,17 @@ import LazyDiskCore
 
 enum ExportService {
     static func exportCSV(entries: [DiskItem], to url: URL) throws {
-        var lines = ["Name,Path,Size,Kind,Modified"]
+        var lines = ["Name,Path,Size,Reclaimable,Kind,Modified"]
         let formatter = ISO8601DateFormatter()
 
         for item in entries where !item.isVirtual {
             let name = csvEscape(item.name)
             let path = csvEscape(item.url.path)
             let size = "\(item.size)"
+            let reclaimable = "\(item.reclaimableSize)"
             let kind = csvEscape(item.fileKind.rawValue)
             let modified = item.modifiedDate.map { formatter.string(from: $0) } ?? ""
-            lines.append("\(name),\(path),\(size),\(kind),\(modified)")
+            lines.append("\(name),\(path),\(size),\(reclaimable),\(kind),\(modified)")
         }
 
         try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
@@ -29,6 +30,7 @@ enum ExportService {
             let name: String
             let path: String
             let size: Int64
+            let reclaimable: Int64
             let kind: String
             let modified: Date?
         }
@@ -46,7 +48,14 @@ enum ExportService {
         }
 
         let rows = entries.filter { !$0.isVirtual }.map {
-            ExportRow(name: $0.name, path: $0.url.path, size: $0.size, kind: $0.fileKind.rawValue, modified: $0.modifiedDate)
+            ExportRow(
+                name: $0.name,
+                path: $0.url.path,
+                size: $0.size,
+                reclaimable: $0.reclaimableSize,
+                kind: $0.fileKind.rawValue,
+                modified: $0.modifiedDate
+            )
         }
 
         let metricsPayload = scanMetrics.map {

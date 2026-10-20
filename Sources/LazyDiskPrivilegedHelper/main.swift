@@ -48,7 +48,7 @@ final class PrivilegedScanHelper: NSObject, NSXPCListenerDelegate, PrivilegedSca
     }
 
     func helperVersion(withReply reply: @escaping (NSString) -> Void) {
-        reply("2" as NSString)
+        reply("3" as NSString)
     }
 
     func startScanRequest(
@@ -136,6 +136,22 @@ final class PrivilegedScanHelper: NSObject, NSXPCListenerDelegate, PrivilegedSca
                 reply(nil, NSError(domain: "LazyDisk.AdminHelper", code: Int(EIO), userInfo: [
                     NSLocalizedDescriptionKey: "Native scan failed."
                 ]))
+            }
+        }
+    }
+
+    func deleteLocalSnapshot(
+        named name: String,
+        atPath path: String,
+        withReply reply: @escaping (NSNumber?, NSError?) -> Void
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try APFSSnapshotStore.delete(name: name, volumePath: path)
+                reply(NSNumber(value: 1), nil)
+            } catch {
+                let nsError = error as NSError
+                reply(nil, nsError)
             }
         }
     }

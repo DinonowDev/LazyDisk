@@ -7,6 +7,27 @@ extension DiskItem {
         return name
     }
 
+    var showsReclaimableGap: Bool {
+        !sizeIsEstimate && reclaimableSize != size
+    }
+
+    var formattedReclaimableSize: String {
+        let text = ByteFormatter.string(from: reclaimableSize)
+        return sizeIsEstimate ? "~\(text)" : text
+    }
+
+    var sidebarSizeText: String {
+        sizeIsEstimate ? "~\(formattedSize)" : formattedSize
+    }
+
+    var reclaimNote: String? {
+        if sizeIsEstimate { return L10n.reclaimEstimateNote }
+        if isCloudPlaceholder || role == .cloudSummary { return L10n.reclaimCloudNote }
+        if role == .regular, !isDirectory, cloneReferenceCount > 1 { return L10n.reclaimCloneNote }
+        if role == .regular, !isDirectory, linkCount > 1 { return L10n.reclaimLinkNote }
+        return nil
+    }
+
     var formattedModifiedDate: String {
         guard let modifiedDate else { return "—" }
         return DiskItem.modifiedDateFormatter.string(from: modifiedDate)

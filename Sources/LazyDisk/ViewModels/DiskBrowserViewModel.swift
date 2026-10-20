@@ -48,6 +48,8 @@ final class DiskBrowserViewModel: ObservableObject {
     @Published var searchIndexStatus: String = ""
     @Published var searchIndexEntryCount: Int = 0
     @Published var activePanel: AppPanel = .browser
+    @Published var snapshotBrowser: SnapshotBrowserState?
+    @Published var showSnapshotDeleteConfirmation = false
     @Published var languageRevision: Int = 0
 
     // Cleanup
@@ -156,6 +158,8 @@ final class DiskBrowserViewModel: ObservableObject {
     var pendingExternalAnalyzeURL: URL?
     static let chartOtherGroupID = UUID(uuidString: "A0000000-0000-4000-8000-000000000001")!
     let chartSmallItemThresholdPercent = 2.0
+    var pendingSnapshotDeleteName: String?
+    var pendingSnapshotDeleteTitle = ""
 
     init() {
         externalOpenObserver = NotificationCenter.default.addObserver(
@@ -199,6 +203,10 @@ final class DiskBrowserViewModel: ObservableObject {
             crumbs.append(current)
         }
 
+        if let snapshotBrowser {
+            crumbs.append(VirtualDiskPath.snapshotGroup(volumePath: snapshotBrowser.volumePath))
+        }
+
         return crumbs
     }
 
@@ -238,7 +246,17 @@ final class DiskBrowserViewModel: ObservableObject {
         return sortOrder.sort(result)
     }
 
+    var isShowingSnapshots: Bool { snapshotBrowser != nil }
+
     var browserListEntries: [DiskItem] {
+        if let snapshotBrowser {
+            var items = snapshotBrowser.items
+            let query = debouncedSearchText.trimmingCharacters(in: .whitespaces)
+            if !query.isEmpty {
+                items = items.filter { $0.displayName.localizedCaseInsensitiveContains(query) }
+            }
+            return sortOrder.sort(items)
+        }
         guard activeSmartCollection != nil else { return filteredEntries }
 
         var result = smartCollectionResults
@@ -275,6 +293,9 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     var displayTotalSize: Int64 {
+        if let snapshotBrowser {
+            return max(snapshotBrowser.totalBytes, 1)
+        }
         if activeSmartCollection != nil {
             return max(browserListEntries.reduce(0) { $0 + $1.size }, 1)
         }
@@ -362,6 +383,10 @@ final class DiskBrowserViewModel: ObservableObject {
     }
 
     var collectorSize: Int64 {
+        collectorItems.reduce(0) { $0 + $1.reclaimableSize }
+    }
+
+    var collectorApparentSize: Int64 {
         collectorItems.reduce(0) { $0 + $1.size }
     }
 

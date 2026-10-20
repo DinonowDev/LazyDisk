@@ -153,47 +153,23 @@ actor DiskScanner {
         volume: VolumeInfo,
         atVolumeRoot: Bool
     ) -> [DiskItem] {
-        guard atVolumeRoot else { return items }
-
-        var result = items.filter { !$0.isVirtual }
-        let scannedTotal = result.reduce(Int64(0)) { $0 + $1.size }
-        let purgeable = max(volume.purgeableCapacity, 0)
-        let residual = volume.usedCapacity - scannedTotal - purgeable
-
-        if residual > 50_000_000 {
-            result.append(DiskItem(
-                url: URL(fileURLWithPath: "/"),
-                name: L10n.systemUnscanned,
-                size: residual,
-                isDirectory: false,
-                isVirtual: true
-            ))
-        }
-
-        if purgeable > 10_000_000 {
-            result.append(DiskItem(
-                url: URL(fileURLWithPath: "/"),
-                name: L10n.purgeableSpace,
-                size: purgeable,
-                isDirectory: false,
-                isVirtual: true,
-                isPurgeable: true
-            ))
-        }
-
-        let cloudTotal = result.filter(\.isCloudPlaceholder).reduce(Int64(0)) { $0 + $1.size }
-        if cloudTotal > 1_000_000 {
-            result.append(DiskItem(
-                url: URL(fileURLWithPath: "/"),
-                name: L10n.iCloudPlaceholder,
-                size: cloudTotal,
-                isDirectory: false,
-                isVirtual: true,
-                isCloudPlaceholder: true
-            ))
-        }
-
-        return result.sorted { $0.size > $1.size }
+        let snapshots = atVolumeRoot
+            ? APFSSnapshotStore.list(volumePath: volume.scanRoot.path).filter { APFSSnapshotName.isDeletable($0.name) }
+            : []
+        return VolumeUsageReconciler.reconcile(
+            items: items,
+            volumePath: volume.scanRoot.path,
+            usedCapacity: volume.usedCapacity,
+            purgeableCapacity: volume.purgeableCapacity,
+            snapshots: snapshots,
+            atVolumeRoot: atVolumeRoot,
+            labels: VolumeReconcileLabels(
+                purgeable: L10n.purgeableSpace,
+                unscanned: L10n.systemUnscanned,
+                cloud: L10n.iCloudPlaceholder,
+                snapshots: L10n.localSnapshots
+            )
+        )
     }
 
     func clearSizeCache() async {

@@ -119,10 +119,13 @@ struct SunburstChartView: View {
                         cornerRadius: cornerRadius
                     )
                     .stroke(
-                        isDaisyDisk
-                            ? Color(white: 0.12)
-                            : Color.white.opacity(isHovered ? 0.45 : 0.15),
-                        lineWidth: isDaisyDisk ? 1.5 : (isHovered ? 1.5 : 0.75)
+                        segment.item.isVirtual
+                            ? Color.primary.opacity(0.55)
+                            : (isDaisyDisk ? Color(white: 0.12) : Color.white.opacity(isHovered ? 0.45 : 0.15)),
+                        style: StrokeStyle(
+                            lineWidth: isDaisyDisk ? 1.5 : (isHovered ? 1.5 : 0.75),
+                            dash: segment.item.isVirtual ? [4, 3] : []
+                        )
                     )
                 }
                 .scaleEffect(isDaisyDisk ? 1 : (isHovered ? 1.02 : 1), anchor: .center)
@@ -130,9 +133,7 @@ struct SunburstChartView: View {
                 .animation(hoverAnimation, value: isHovered)
                 .frame(width: chartSize, height: chartSize)
                 .position(center)
-                .onDrag {
-                    NSItemProvider(object: segment.item.url as NSURL)
-                }
+                .modifier(ChartSegmentDrag(item: segment.item))
                 .contextMenu {
                     if !segment.item.isVirtual {
                         Button(L10n.addToCollector) { onAddToCollector?(segment.item) }
@@ -146,6 +147,9 @@ struct SunburstChartView: View {
     }
 
     private func segmentFill(segment: SunburstSegment, isHovered: Bool) -> AnyShapeStyle {
+        if segment.item.isVirtual {
+            return AnyShapeStyle(DiskColors.virtualColor(for: segment.item.role))
+        }
         let color = DiskColors.spectrumColor(
             hue: segment.hue,
             saturation: segment.saturation,

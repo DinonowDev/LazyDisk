@@ -46,5 +46,15 @@ struct RootView: View {
         .sheet(isPresented: $viewModel.showAbout) {
             AboutView()
         }
+        .alert(L10n.snapshotDeleteTitle, isPresented: $viewModel.showSnapshotDeleteConfirmation) {
+            Button(L10n.cancel, role: .cancel) {
+                viewModel.pendingSnapshotDeleteName = nil
+            }
+            Button(L10n.snapshotDelete, role: .destructive) {
+                viewModel.confirmSnapshotDelete()
+            }
+        } message: {
+            Text(L10n.snapshotDeleteMessage(viewModel.pendingSnapshotDeleteTitle))
+        }
     }
 }

@@ -14,6 +14,9 @@ final class LocalizationCompletenessTests: XCTestCase {
             .devEmptyDesc, .devReclaimable, .devSummarySubtitle, .devGroupByProject,
             .devPurposeDependencies, .devSafetySafe, .devDescNodeModules,
             .finderAnalyzeVolumeNotFound, .finderAnalyzeHelp,
+            .localSnapshots, .snapshotDelete, .snapshotDeleteTitle, .snapshotDeleteMessage,
+            .snapshotDeleteNeedsHelper, .snapshotSizeEstimate, .detailFrees, .detailApparent,
+            .reclaimCloudNote, .reclaimCloneNote, .reclaimLinkNote, .reclaimEstimateNote, .collectorApparent,
         ]
         let languages: [AppLanguage] = [.english, .persian, .chinese, .french, .arabic, .turkish]
 

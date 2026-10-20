@@ -131,7 +131,9 @@ struct RoseChartView: View {
                     outerRadius: outerR,
                     cornerRadius: 8
                 )
-                .fill(DiskColors.gradient(for: layout.index))
+                .fill(layout.item.isVirtual
+                      ? DiskColors.virtualGradient(for: layout.item.role)
+                      : DiskColors.gradient(for: layout.index))
                 .shadow(
                     color: DiskColors.color(for: layout.index).opacity(isHovered ? 0.4 : 0.15),
                     radius: isHovered ? 14 : 5,
@@ -145,16 +147,17 @@ struct RoseChartView: View {
                         outerRadius: outerR,
                         cornerRadius: 8
                     )
-                    .stroke(Color.white.opacity(isHovered ? 0.5 : 0.2), lineWidth: isHovered ? 2 : 1)
+                    .stroke(
+                        layout.item.isVirtual ? Color.primary.opacity(0.55) : Color.white.opacity(isHovered ? 0.5 : 0.2),
+                        style: StrokeStyle(lineWidth: isHovered ? 2 : 1, dash: layout.item.isVirtual ? [5, 3] : [])
+                    )
                 }
                 .scaleEffect(isHovered ? 1.03 : 1, anchor: .center)
                 .opacity(dimmed ? 0.45 : 1)
                 .animation(hoverAnimation, value: isHovered)
                 .frame(width: chartSize, height: chartSize)
                 .position(center)
-                .onDrag {
-                    NSItemProvider(object: layout.item.url as NSURL)
-                }
+                .modifier(ChartSegmentDrag(item: layout.item))
                 .contextMenu {
                     if !layout.item.isVirtual {
                         Button(L10n.addToCollector) { onAddToCollector?(layout.item) }

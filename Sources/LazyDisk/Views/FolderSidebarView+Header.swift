@@ -115,10 +115,11 @@ extension FolderSidebarView {
         ) { url in
             if viewModel.isDetailPanelVisible,
                let item = viewModel.detailItem,
+               !VirtualDiskPath.isVirtual(url),
                PathUtils.resolved(url).path == PathUtils.resolved(item.url).path {
                 return
             }
-            viewModel.navigate(to: url)
+            viewModel.navigateFromBreadcrumb(url)
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 4)

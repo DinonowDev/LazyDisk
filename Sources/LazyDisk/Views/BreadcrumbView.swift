@@ -1,4 +1,5 @@
 import SwiftUI
+import LazyDiskCore
 
 struct BreadcrumbView: View {
     let breadcrumbs: [URL]
@@ -56,6 +57,10 @@ struct BreadcrumbView: View {
 
     private func displayName(for url: URL, index: Int) -> String {
         if index == 0 { return volumeName }
+        if VirtualDiskPath.isSnapshotGroup(url) { return L10n.localSnapshots }
+        if VirtualDiskPath.isVirtual(url) {
+            return APFSSnapshotName.displayName(raw: url.lastPathComponent, created: nil)
+        }
         let name = url.lastPathComponent
         return name.isEmpty ? "/" : name
     }

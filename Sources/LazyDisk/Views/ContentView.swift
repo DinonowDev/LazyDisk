@@ -68,7 +68,7 @@ struct ContentView: View {
         HSplitView {
             mainPanel
                 .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(0)
+                .layoutPriority(1)
                 .clipped()
 
             VStack(spacing: 0) {
@@ -83,7 +83,7 @@ struct ContentView: View {
                 ),
                 maxWidth: BrowserSidebarMetrics.professionalMaxWidth
             )
-            .layoutPriority(1)
+            .layoutPriority(0)
             .clipped()
             .trackPanelWidth { viewModel.saveSidebarWidth($0) }
         }
@@ -253,12 +253,7 @@ struct ContentView: View {
     }
 
     private var centerFolderName: String {
-        if viewModel.isAtVolumeRoot {
-            return viewModel.selectedVolume?.name ?? L10n.diskLabel
-        }
-        guard let path = viewModel.currentPath else { return L10n.diskLabel }
-        let name = path.lastPathComponent
-        return name.isEmpty ? path.path : name
+        viewModel.chartCenterTitle
     }
 
     private func hintItem(icon: String, text: String) -> some View {
@@ -323,7 +318,7 @@ private struct ChartPanelView: View {
                             segments: viewModel.sunburstSegments,
                             totalSize: viewModel.displayTotalSize,
                             centerTitle: centerFolderName,
-                            centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                            centerSubtitle: viewModel.chartCenterSubtitle,
                             layoutConfig: viewModel.interfaceMode == .simple
                                 ? .daisyDisk
                                 : .standard,
@@ -352,7 +347,7 @@ private struct ChartPanelView: View {
                             items: viewModel.chartItems,
                             totalSize: viewModel.displayTotalSize,
                             centerTitle: centerFolderName,
-                            centerSubtitle: viewModel.isLoading ? L10n.scanning : nil,
+                            centerSubtitle: viewModel.chartCenterSubtitle,
                             hoveredID: effectiveChartHover,
                             onHover: setChartHover,
                             onSelect: chartItemSelected,

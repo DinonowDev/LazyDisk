@@ -107,6 +107,16 @@ int ldfs_scan_tree(
 
 void ldfs_free_path_stats(ldfs_path_stat *stats, size_t count);
 
+/// Reference count of an APFS clone, or 0 when the file is not a shared clone.
+int ldfs_clone_reference_count(const char *path, uint32_t *out_count);
+
+/// JSON array of local APFS snapshots. `*json_out` is malloc'd; caller frees it.
+/// Returns 0 on success (including an empty list). `bytes` is -1 when unknown.
+int ldfs_list_snapshots_json(const char *volume_path, char **json_out);
+
+/// Deletes one local snapshot. Returns 0 or a negative errno.
+int ldfs_delete_snapshot(const char *volume_path, const char *name);
+
 #ifdef __cplusplus
 }
 #endif

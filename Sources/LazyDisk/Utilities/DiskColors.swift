@@ -1,4 +1,5 @@
 import SwiftUI
+import LazyDiskCore
 
 enum DiskColors {
     // DaisyDisk-inspired vibrant rainbow palette
@@ -28,6 +29,28 @@ enum DiskColors {
         Color(red: 0.259, green: 0.647, blue: 0.580), // teal
         Color(red: 0.847, green: 0.451, blue: 0.451), // coral
     ]
+
+    static func virtualGradient(for role: DiskItemRole) -> LinearGradient {
+        let base = virtualColor(for: role)
+        return LinearGradient(
+            colors: [base.opacity(0.55), base.opacity(0.85)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static func virtualColor(for role: DiskItemRole) -> Color {
+        switch role {
+        case .snapshotGroup, .snapshot:
+            return Color(red: 0.45, green: 0.58, blue: 0.68)
+        case .purgeable:
+            return Color(red: 0.35, green: 0.72, blue: 0.48)
+        case .cloudSummary:
+            return Color(red: 0.45, green: 0.62, blue: 0.82)
+        case .unscanned, .regular:
+            return Color(white: 0.55)
+        }
+    }
 
     static func color(for index: Int, palette: [Color] = palette) -> Color {
         palette[index % palette.count]

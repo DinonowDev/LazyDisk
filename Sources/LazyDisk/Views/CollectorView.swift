@@ -100,6 +100,11 @@ struct CollectorView: View {
                         Text(ByteFormatter.string(from: viewModel.collectorSize))
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .foregroundStyle(.green)
+                        if viewModel.collectorApparentSize > viewModel.collectorSize {
+                            Text("\(L10n.collectorApparent) \(ByteFormatter.string(from: viewModel.collectorApparentSize))")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
 
                         if viewModel.collectorFreePercent > 0.1 {
                             Text(String(format: "(%.1f%% \(L10n.collectorPercent))", viewModel.collectorFreePercent))
@@ -296,7 +301,7 @@ private struct CollectorChip: View {
                     .font(.system(size: 10, weight: .medium))
                     .lineLimit(1)
                     .frame(maxWidth: 110, alignment: .leading)
-                Text(item.formattedSize)
+                Text(item.showsReclaimableGap ? item.formattedReclaimableSize : item.sidebarSizeText)
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -331,6 +336,18 @@ struct ItemDragModifier: ViewModifier {
             }
         } else {
             content
+        }
+    }
+}
+
+struct ChartSegmentDrag: ViewModifier {
+    let item: DiskItem
+
+    func body(content: Content) -> some View {
+        if item.isVirtual {
+            content
+        } else {
+            content.onDrag { NSItemProvider(object: item.url as NSURL) }
         }
     }
 }

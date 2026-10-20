@@ -102,7 +102,9 @@ struct TreemapChartView: View {
 
                 ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: tile.depth == 0 ? 6 : 4, style: .continuous)
-                        .fill(DiskColors.gradient(for: tile.colorIndex, depth: tile.depth))
+                        .fill(tile.item.isVirtual
+                              ? DiskColors.virtualGradient(for: tile.item.role)
+                              : DiskColors.gradient(for: tile.colorIndex, depth: tile.depth))
                     RoundedRectangle(cornerRadius: tile.depth == 0 ? 6 : 4, style: .continuous)
                         .stroke(
                             Color.white.opacity(isHovered ? 0.55 : (tile.depth == 0 ? 0.22 : 0.35)),
@@ -132,7 +134,7 @@ struct TreemapChartView: View {
                 .opacity(dimmed ? 0.45 : (hasNestedChildren && tile.depth == 0 ? 0.92 : 1))
                 .animation(.easeOut(duration: 0.12), value: isHovered)
                 .zIndex(Double(tile.depth))
-                .onDrag { NSItemProvider(object: tile.item.url as NSURL) }
+                .modifier(ChartSegmentDrag(item: tile.item))
                 .contextMenu {
                     if !tile.item.isVirtual {
                         Button(L10n.addToCollector) { onAddToCollector?(tile.item) }

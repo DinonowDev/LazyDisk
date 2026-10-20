@@ -14,6 +14,10 @@ public struct DiskItem: Identifiable, Hashable, Sendable, Codable {
     public var fileKind: FileKind
     public var isCloudPlaceholder: Bool
     public var isPurgeable: Bool
+    public var linkCount: Int
+    public var cloneReferenceCount: UInt32
+    public var role: DiskItemRole
+    public var sizeIsEstimate: Bool
 
     public init(
         id: UUID = UUID(),
@@ -28,7 +32,11 @@ public struct DiskItem: Identifiable, Hashable, Sendable, Codable {
         modifiedDate: Date? = nil,
         fileKind: FileKind? = nil,
         isCloudPlaceholder: Bool = false,
-        isPurgeable: Bool = false
+        isPurgeable: Bool = false,
+        linkCount: Int = 1,
+        cloneReferenceCount: UInt32 = 0,
+        role: DiskItemRole = .regular,
+        sizeIsEstimate: Bool = false
     ) {
         self.id = id
         self.url = url
@@ -43,6 +51,25 @@ public struct DiskItem: Identifiable, Hashable, Sendable, Codable {
         self.fileKind = fileKind ?? FileKind.detect(url: url, isDirectory: isDirectory)
         self.isCloudPlaceholder = isCloudPlaceholder
         self.isPurgeable = isPurgeable
+        self.linkCount = linkCount
+        self.cloneReferenceCount = cloneReferenceCount
+        self.role = role
+        self.sizeIsEstimate = sizeIsEstimate
+    }
+
+    /// Bytes deleting this item actually returns to the volume.
+    public var reclaimableSize: Int64 {
+        switch role {
+        case .purgeable, .unscanned, .cloudSummary:
+            return 0
+        case .snapshot, .snapshotGroup:
+            return max(0, size)
+        case .regular:
+            if isCloudPlaceholder { return 0 }
+            if !isDirectory, linkCount > 1 { return 0 }
+            if !isDirectory, cloneReferenceCount > 1 { return 0 }
+            return max(0, size)
+        }
     }
 
     public var formattedSize: String {

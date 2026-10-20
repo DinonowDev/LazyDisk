@@ -29,6 +29,12 @@ public protocol PrivilegedScanHelperProtocol {
 
     /// Legacy sizing entry point (kept for older clients).
     func scanTotalSize(atPath path: String, withReply reply: @escaping (NSNumber?, NSError?) -> Void)
+
+    func deleteLocalSnapshot(
+        named name: String,
+        atPath path: String,
+        withReply reply: @escaping (NSNumber?, NSError?) -> Void
+    )
 }
 
 public enum PrivilegedScanMachService {

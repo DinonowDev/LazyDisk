@@ -385,6 +385,18 @@ extension DiskBrowserViewModel {
             return
         }
 
+        if item.role == .snapshotGroup {
+            openSnapshotBrowser()
+            return
+        }
+        if item.role == .snapshot {
+            if interfaceMode == .simple {
+                requestSnapshotDelete(item)
+            } else {
+                selectItemForDetail(item)
+            }
+            return
+        }
         guard !item.isVirtual else { return }
         selectedIDs = [item.id]
         hoveredID = item.id

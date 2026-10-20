@@ -10,7 +10,8 @@ extension DiskScanner {
         .isSymbolicLinkKey,
         .contentModificationDateKey,
         .isUbiquitousItemKey,
-        .ubiquitousItemDownloadingStatusKey
+        .ubiquitousItemDownloadingStatusKey,
+        .linkCountKey
     ]
 
     static let lightListingKeys: [URLResourceKey] = [
@@ -47,12 +48,17 @@ extension DiskScanner {
             let isUbiquitous = light ? false : (values?.isUbiquitousItem ?? false)
             let downloadStatus = light ? nil : values?.ubiquitousItemDownloadingStatus
             let isCloudPlaceholder = isUbiquitous && downloadStatus == .notDownloaded
+            let linkCount = isDir ? 1 : max(values?.linkCount ?? 1, 1)
 
             if isSymlink && !isDir {
                 continue
             }
 
             let resolved = PathUtils.resolved(childURL)
+            var cloneReferenceCount: UInt32 = 0
+            if !light && !isDir && !isCloudPlaceholder && allocated >= 65_536 {
+                cloneReferenceCount = FileReclaimProbe.cloneReferenceCount(atPath: resolved.path)
+            }
 
             if isDir {
                 items.append(DiskItem(
@@ -61,7 +67,8 @@ extension DiskScanner {
                     isScanning: true,
                     isHidden: isHidden,
                     modifiedDate: modified,
-                    isCloudPlaceholder: isCloudPlaceholder
+                    isCloudPlaceholder: isCloudPlaceholder,
+                    linkCount: linkCount
                 ))
             } else {
                 items.append(DiskItem(
@@ -70,7 +77,9 @@ extension DiskScanner {
                     isDirectory: false,
                     isHidden: isHidden,
                     modifiedDate: modified,
-                    isCloudPlaceholder: isCloudPlaceholder
+                    isCloudPlaceholder: isCloudPlaceholder,
+                    linkCount: linkCount,
+                    cloneReferenceCount: cloneReferenceCount
                 ))
             }
         }

@@ -201,7 +201,8 @@ extension DiskBrowserViewModel {
             }
 
             let percent = item.percentage(of: total)
-            if percent < chartSmallItemThresholdPercent {
+            let keepAccountingSlice = item.role != .regular
+            if !keepAccountingSlice && percent < chartSmallItemThresholdPercent {
                 otherSize += item.size
                 otherCount += 1
             } else {
