@@ -62,7 +62,7 @@ public enum StringKey: String, CaseIterable {
     case permTerminalTitle, permTerminalHint, permFDATargetTitle, permFDATargetHint, permRestartAfterFDA
     case permCopyAppPath, permCheckAgain
     case back, openSettings, scanAnyway, grantAllPerms
-    case prefScanning, prefDisplay, prefDefaultSort, done, ok, errorTitle
+    case prefScanning, prefDisplay, prefDefaultSort, done, save, ok, errorTitle
     case emptyFolder, diskLabel, folderLabel, volumeLabel, goUp, selectAll
     case menuNavigate, menuSortBy, menuFile
     case goalReached, goalNeedMore, dupWaste, dupCopiesCount, hiddenLabel, itemsSelected, hintSidebar
@@ -424,6 +424,7 @@ public struct LocalizationCatalog {
         .prefDisplay: ml(en: "Display", fa: "نمایش", zh: "显示", fr: "Affichage", ar: "العرض", tr: "Görünüm"),
         .prefDefaultSort: ml(en: "Default sort", fa: "مرتب‌سازی پیش‌فرض", zh: "默认排序", fr: "Tri par défaut", ar: "الترتيب الافتراضي", tr: "Varsayılan sıralama"),
         .done: ml(en: "Done", fa: "تمام", zh: "完成", fr: "Terminé", ar: "تم", tr: "Bitti"),
+        .save: ml(en: "Save", fa: "ذخیره", zh: "保存", fr: "Enregistrer", ar: "حفظ", tr: "Kaydet"),
         .ok: ml(en: "OK", fa: "باشه", zh: "好", fr: "OK", ar: "موافق", tr: "Tamam"),
         .errorTitle: ml(en: "Error", fa: "خطا", zh: "错误", fr: "Erreur", ar: "خطأ", tr: "Hata"),
         .emptyFolder: ml(en: "Empty folder", fa: "فولدر خالی", zh: "空文件夹", fr: "Dossier vide", ar: "مجلد فارغ", tr: "Boş klasör"),

@@ -452,6 +452,7 @@ enum L10n {
     static var prefDisplay: String { t(.prefDisplay) }
     static var prefDefaultSort: String { t(.prefDefaultSort) }
     static var done: String { t(.done) }
+    static var save: String { t(.save) }
     static var ok: String { t(.ok) }
     static var errorTitle: String { t(.errorTitle) }
     static var emptyFolder: String { t(.emptyFolder) }
