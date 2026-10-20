@@ -8,6 +8,10 @@ final class FullDiskAccessProbeTests: XCTestCase {
 
     func testDoesNotGrantFromWorldReadableVarAlone() {
         final class StubManager: FileManager, @unchecked Sendable {
+            override func fileExists(atPath path: String) -> Bool {
+                path == "/private/var"
+            }
+
             override func fileExists(atPath path: String, isDirectory: UnsafeMutablePointer<ObjCBool>?) -> Bool {
                 if path.hasSuffix("Library/Safari") {
                     isDirectory?.pointee = false
