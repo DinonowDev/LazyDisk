@@ -28,10 +28,13 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 - **Folder browser** — Chart plus sidebar file list with sortable columns (name, size, modified date)
 - **Breadcrumbs** — Jump to any ancestor folder; back via ↑ or ⌫
 - **Smart Collections** — One-click scans for Large Files, Old Files, Xcode junk, `node_modules`, and Old Downloads
-- **Detail panel** — Size, modified/created dates, full path; Quick Look and Collector actions
+- **Detail panel** — Apparent size and the bytes a delete actually frees, plus dates, path, Quick Look, and Collector actions
 - **Bookmarks & recent folders** — Quick navigation in the toolbar
 - **External volumes** — Scan USB drives and network mounts alongside the system disk
 - **iCloud / purgeable breakdown** — Storage header shows used, free, and purgeable space
+- **Local snapshots** — APFS local snapshots are their own chart slice. Open the slice to see each snapshot and its date, then delete one with the Admin Helper. macOS does not report a size per snapshot, so the slices share the disk's purgeable space and are marked as estimates. Sealed system snapshots are not offered for deletion.
+- **Space a delete frees** — Sidebar, detail panel, and Collector show the bytes deletion returns. An iCloud file that is not downloaded, an APFS clone that still has other copies, or an extra hard link frees nothing.
+- **Virtual slices** — Snapshots, purgeable space, and unscanned system space use a dashed outline and cannot be dragged into the Collector. The chart keeps the extra window space.
 
 ### Scanning
 
@@ -45,7 +48,7 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 
 ### Cleanup & safety
 
-- **Collector** — Drag items (or ⌘D) into a staging area before deleting; shows projected free space
+- **Collector** — Drag items (or ⌘D) into a staging area before deleting; the total is space that will actually be freed, with apparent size shown when it differs
 - **Safe cleanup** — Permanent delete with warnings for protected paths (system, app bundles, etc.)
 - **Cleanup panel** — Suggestions for caches, logs, installers, and known junk locations
 - **Free Space Goal** — Set a target free-space amount and get ranked suggestions to reach it
@@ -71,7 +74,7 @@ All charts share a unified legend, label layout, and keyboard navigation (↑ ba
 
 - **6 languages** — English, Persian (فارسی), Chinese (中文), French, Arabic (العربية), Turkish — RTL for Persian and Arabic
 - **Menu bar widget** — Usage bar, free/used stats, quick open and rescan actions
-- **Export** — CSV and JSON export of the current folder from the toolbar menu
+- **Export** — CSV and JSON export of the current folder from the toolbar menu, including reclaimable bytes
 - **CLI** — Headless scan, duplicates, cleanup, and dev-junk from Terminal
 - **Quick Look** — Space bar preview for selected files
 - **Keyboard shortcuts** — Navigation, Collector, rescan, and panel switching
@@ -126,7 +129,7 @@ CI runs `swift build`, `swift test`, and `Scripts/build-app.sh` on macOS via Git
 
 Pre-built `.app` bundles are available on **[GitHub Releases](https://github.com/DinonowDev/LazyDisk/releases)**.
 
-**Latest:** [v2.0.3](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-2.0.3-macos.zip` (macOS 13+, Apple Silicon & Intel)
+**Latest:** [v2.0.4](https://github.com/DinonowDev/LazyDisk/releases/latest) — `LazyDisk-2.0.4-macos.zip` (macOS 13+, Apple Silicon & Intel)
 
 1. Download the latest release zip.
 2. Unzip and open `LazyDisk.app` (right-click → **Open** if Gatekeeper blocks unsigned builds).
@@ -230,6 +233,8 @@ LazyDisk opens the Browse panel and navigates to that folder (starting a volume 
 |--------|-----|
 | Open a folder | Click chart segment or double-click in sidebar |
 | View file details | Single-click in sidebar, or click a file in the chart |
+| See space a delete frees | Detail panel → Frees; the Collector total uses that number |
+| Open local snapshots | Click the Local Snapshots slice, then delete one from its detail |
 | Smart Collection | Sidebar → Smart Collections → pick a collection |
 | Switch chart style | Segmented control above chart, or **Display** menu |
 | Go back | Breadcrumbs, ↑, or ⌫ |
